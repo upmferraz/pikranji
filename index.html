@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kanji Picross</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            touch-action: manipulation;
+        }
+        .board-container {
+            display: grid;
+            grid-template-columns: min-content 1fr;
+            grid-template-rows: min-content 1fr;
+            gap: 2px;
+            width: 80vw;
+            height: 80vw;
+            max-width: 600px;
+            max-height: 600px;
+        }
+        .clues-top {
+            grid-column: 2 / 3;
+            grid-row: 1 / 2;
+            display: flex;
+            justify-content: space-around;
+        }
+        .clues-left {
+            grid-column: 1 / 2;
+            grid-row: 2 / 3;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+            align-items: flex-end;
+        }
+        .clue-cell {
+            color: #4b5563;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 4px;
+            text-align: center;
+            font-size: 0.75rem;
+        }
+        .clues-top .clue-cell {
+            flex-direction: column;
+            padding: 4px 0;
+            width: 100%;
+        }
+        .clues-left .clue-cell {
+            padding: 0 4px;
+            height: 100%;
+        }
+        .game-grid {
+            grid-column: 2 / 3;
+            grid-row: 2 / 3;
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            gap: 1px;
+            border: 1px solid #d1d5db;
+        }
+        .cell {
+            width: 100%;
+            height: 100%;
+            border: 1px solid #d1d5db;
+            background-color: #f3f4f6;
+            cursor: pointer;
+            transition: background-color 0.1s ease-in-out;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .cell.filled {
+            background-color: #374151;
+            border-color: #374151;
+        }
+        .cell.marked::before {
+            content: '×';
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            font-size: 0.6em;
+            line-height: 1;
+        }
+        .control-btn.active {
+            background-color: #4f46e5;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        @media (max-width: 640px) {
+            .board-container {
+                width: 90vw;
+                height: 90vw;
+            }
+        }
+    </style>
+</head>
+<body class="bg-stone-100 text-stone-800 flex flex-col items-center justify-center min-h-screen p-4">
+
+    <div id="app-container" class="w-full max-w-4xl mx-auto flex flex-col items-center">
+        
+        <header class="text-center mb-6">
+            <h1 class="text-4xl md:text-5xl font-bold text-stone-900">Kanji Picross</h1>
+            <p class="text-stone-600 mt-2">Resolva o puzzle para revelar o Kanji!</p>
+        </header>
+
+        <main class="w-full flex flex-col items-center bg-white p-6 rounded-2xl shadow-lg">
+            
+            <div id="kanji-info" class="mb-4 text-center">
+                <p class="text-lg text-stone-500">Significado:</p>
+                <h2 id="kanji-meaning" class="text-3xl font-semibold text-indigo-600"></h2>
+            </div>
+            
+            <div id="game-board-container" class="w-full flex items-center justify-center mb-6">
+                <div id="game-board" class="board-container"></div>
+            </div>
+
+            <div id="controls" class="flex flex-wrap items-center justify-center gap-4">
+                <div class="flex gap-2 rounded-lg p-1 bg-stone-200">
+                    <button id="fill-btn" class="control-btn active px-4 py-2 rounded-md text-lg font-semibold transition-all duration-200">
+                        ⬛
+                    </button>
+                    <button id="mark-btn" class="control-btn px-4 py-2 rounded-md text-lg font-semibold transition-all duration-200">
+                        ❌
+                    </button>
+                </div>
+                <button id="reset-btn" class="px-5 py-3 bg-stone-500 text-white rounded-lg font-semibold shadow hover:bg-stone-600 transition-colors">Reiniciar</button>
+                <button id="solve-btn" class="px-5 py-3 bg-teal-500 text-white rounded-lg font-semibold shadow hover:bg-teal-600 transition-colors">Resolver</button>
+                <button id="next-btn" class="px-5 py-3 bg-indigo-600 text-white rounded-lg font-semibold shadow hover:bg-indigo-700 transition-colors">Próximo Kanji</button>
+            </div>
+
+        </main>
+    </div>
+
+    <div id="win-modal" class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none">
+        <div class="bg-white rounded-2xl p-8 text-center shadow-2xl transform scale-95 transition-all duration-300">
+            <h2 class="text-2xl font-bold mb-2">Parabéns!</h2>
+            <p class="text-stone-600 mb-4">Você revelou o Kanji para:</p>
+            <div id="win-kanji" class="text-8xl font-black text-indigo-600 mb-4"></div>
+            <p id="win-meaning" class="text-2xl font-semibold mb-6"></p>
+            <button id="modal-next-btn" class="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold shadow hover:bg-indigo-700 transition-colors">Próximo Desafio</button>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const board = document.getElementById('game-board');
+            const kanjiMeaning = document.getElementById('kanji-meaning');
+            const fillBtn = document.getElementById('fill-btn');
+            const markBtn = document.getElementById('mark-btn');
+            const resetBtn = document.getElementById('reset-btn');
+            const solveBtn = document.getElementById('solve-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const winModal = document.getElementById('win-modal');
+            const modalNextBtn = document.getElementById('modal-next-btn');
+            const winKanji = document.getElementById('win-kanji');
+            const winMeaning = document.getElementById('win-meaning');
+
+            let puzzles = [];
+            let currentGrid = [];
+            const gridSize = 15;
+            let currentTool = 'fill';
+            let isDragging = false;
+            let cells;
+
+            // Carrega os dados dos puzzles a partir do ficheiro JSON
+            try {
+                const response = await fetch('puzzles.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                puzzles = await response.json();
+                loadRandomPuzzle(); // Inicia com um puzzle aleatório
+            } catch (error) {
+                console.error("Could not load puzzles.json:", error);
+                document.getElementById('app-container').innerHTML = '<p class="text-red-500 text-center">Erro ao carregar os puzzles. Por favor, tente novamente.</p>';
+                return;
+            }
+
+            function generateClues(grid) {
+                const rowClues = grid.map(row => {
+                    let clues = [];
+                    let count = 0;
+                    for (let cell of row) {
+                        if (cell === 1) {
+                            count++;
+                        } else {
+                            if (count > 0) {
+                                clues.push(count);
+                            }
+                            count = 0;
+                        }
+                    }
+                    if (count > 0) {
+                        clues.push(count);
+                    }
+                    return clues.length > 0 ? clues : [0];
+                });
+
+                const colClues = [];
+                for (let c = 0; c < gridSize; c++) {
+                    let clues = [];
+                    let count = 0;
+                    for (let r = 0; r < gridSize; r++) {
+                        if (grid[r][c] === 1) {
+                            count++;
+                        } else {
+                            if (count > 0) {
+                                clues.push(count);
+                            }
+                            count = 0;
+                        }
+                    }
+                    if (count > 0) {
+                        clues.push(count);
+                    }
+                    colClues.push(clues.length > 0 ? clues : [0]);
+                }
+                return { rowClues, colClues };
+            }
+
+            function renderGrid(grid, rowClues, colClues) {
+                board.innerHTML = '';
+
+                const clueTopContainer = document.createElement('div');
+                clueTopContainer.className = `clues-top grid grid-cols-${gridSize}`;
+                clueTopContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+                colClues.forEach(clueSet => {
+                    const clueDiv = document.createElement('div');
+                    clueDiv.className = 'clue-cell';
+                    clueDiv.innerHTML = clueSet.map(c => `<span>${c}</span>`).join('<br>');
+                    clueTopContainer.appendChild(clueDiv);
+                });
+                board.appendChild(clueTopContainer);
+
+                const clueLeftContainer = document.createElement('div');
+                clueLeftContainer.className = `clues-left grid grid-rows-${gridSize}`;
+                clueLeftContainer.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+                rowClues.forEach(clueSet => {
+                    const clueDiv = document.createElement('div');
+                    clueDiv.className = 'clue-cell';
+                    clueDiv.innerHTML = clueSet.map(c => `<span>${c}</span>`).join('&nbsp;');
+                    clueLeftContainer.appendChild(clueDiv);
+                });
+                board.appendChild(clueLeftContainer);
+
+                const gameGrid = document.createElement('div');
+                gameGrid.className = 'game-grid';
+                gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+                gameGrid.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const cell = document.createElement('div');
+                        cell.className = 'cell rounded-sm';
+                        cell.dataset.row = r;
+                        cell.dataset.col = c;
+                        gameGrid.appendChild(cell);
+                    }
+                }
+                board.appendChild(gameGrid);
+                cells = gameGrid.querySelectorAll('.cell');
+            }
+
+            function solvePuzzle() {
+                for (let i = 0; i < cells.length; i++) {
+                    const r = cells[i].dataset.row;
+                    const c = cells[i].dataset.col;
+                    if (currentGrid[r][c] === 1) {
+                        cells[i].classList.add('filled');
+                        cells[i].classList.remove('marked');
+                    } else {
+                        cells[i].classList.remove('filled');
+                        cells[i].classList.remove('marked');
+                    }
+                }
+            }
+
+            function checkWin() {
+                for (let i = 0; i < cells.length; i++) {
+                    const r = cells[i].dataset.row;
+                    const c = cells[i].dataset.col;
+                    const isFilled = cells[i].classList.contains('filled');
+                    const isCorrect = currentGrid[r][c] === 1;
+
+                    if ((isFilled && !isCorrect) || (!isFilled && isCorrect)) {
+                        return false;
+                    }
+                }
+                return true;
+            }
+
+            function showWinModal() {
+                const currentPuzzle = puzzles.find(p => JSON.stringify(p.grid) === JSON.stringify(currentGrid));
+                winKanji.textContent = currentPuzzle.kanji;
+                winMeaning.textContent = currentPuzzle.meaning;
+                winModal.classList.remove('opacity-0', 'pointer-events-none');
+                winModal.querySelector('.bg-white').classList.remove('scale-95');
+                cells.forEach(cell => cell.style.pointerEvents = 'none');
+            }
+
+            function hideWinModal() {
+                winModal.classList.add('opacity-0', 'pointer-events-none');
+                winModal.querySelector('.bg-white').classList.add('scale-95');
+                cells.forEach(cell => cell.style.pointerEvents = 'auto');
+            }
+
+            function loadRandomPuzzle() {
+                const randomIndex = Math.floor(Math.random() * puzzles.length);
+                const puzzle = puzzles[randomIndex];
+                currentGrid = puzzle.grid;
+                kanjiMeaning.textContent = puzzle.meaning;
+                const { rowClues, colClues } = generateClues(currentGrid);
+                renderGrid(currentGrid, rowClues, colClues);
+                hideWinModal();
+            }
+
+            board.addEventListener('mousedown', (e) => {
+                if (e.target.classList.contains('cell')) {
+                    isDragging = true;
+                    handleCellInteraction(e.target);
+                }
+            });
+
+            board.addEventListener('mouseup', () => {
+                isDragging = false;
+                if (checkWin()) {
+                    showWinModal();
+                }
+            });
+
+            board.addEventListener('mouseover', (e) => {
+                if (isDragging && e.target.classList.contains('cell')) {
+                    handleCellInteraction(e.target);
+                }
+            });
+
+            board.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (target && target.classList.contains('cell')) {
+                    isDragging = true;
+                    handleCellInteraction(target);
+                }
+            });
+
+            board.addEventListener('touchend', () => {
+                isDragging = false;
+                if (checkWin()) {
+                    showWinModal();
+                }
+            });
+
+            board.addEventListener('touchmove', (e) => {
+                if (isDragging) {
+                    const touch = e.touches[0];
+                    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                    if (target && target.classList.contains('cell')) {
+                        handleCellInteraction(target);
+                    }
+                }
+            });
+
+            function handleCellInteraction(cell) {
+                if (currentTool === 'fill') {
+                    cell.classList.toggle('filled');
+                    cell.classList.remove('marked');
+                } else {
+                    cell.classList.toggle('marked');
+                    cell.classList.remove('filled');
+                }
+            }
+
+            fillBtn.addEventListener('click', () => {
+                currentTool = 'fill';
+                fillBtn.classList.add('active');
+                markBtn.classList.remove('active');
+            });
+
+            markBtn.addEventListener('click', () => {
+                currentTool = 'mark';
+                markBtn.classList.add('active');
+                fillBtn.classList.remove('active');
+            });
+
+            resetBtn.addEventListener('click', () => {
+                // Reinicia o puzzle atual, não carrega um novo
+                const puzzleToReload = puzzles.find(p => JSON.stringify(p.grid) === JSON.stringify(currentGrid));
+                const { rowClues, colClues } = generateClues(puzzleToReload.grid);
+                renderGrid(puzzleToReload.grid, rowClues, colClues);
+                hideWinModal();
+            });
+
+            solveBtn.addEventListener('click', () => {
+                solvePuzzle();
+                if (checkWin()) {
+                    showWinModal();
+                }
+            });
+
+            // Chama a função para carregar um puzzle aleatório
+            nextBtn.addEventListener('click', loadRandomPuzzle);
+            modalNextBtn.addEventListener('click', loadRandomPuzzle);
+        });
+    </script>
+</body>
+</html>
