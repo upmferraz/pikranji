@@ -1,4 +1,4 @@
-# Pikranji - O Kanji Picross
+# Pikranji - O Picross de Kanjis
 
 -----
 
