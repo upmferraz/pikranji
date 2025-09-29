@@ -37,10 +37,10 @@ Pode alternar entre duas ferramentas usando os botões **`⬛` (Preencher)** e *
 | **Preencher** | `⬛` | Marca uma célula como preenchida (cor preta). |
 | **Marcar** | `❌` | Marca uma célula com um **`×`** (para indicar que deve ficar vazia). |
 
-### 🖱️ Interação por Mouse
+### 🖱️ Interação por Rato
 
   * **Clique Rápido:** Alterna o estado da célula (toggle) de acordo com a ferramenta selecionada.
-  * **Arrastar (Drag):** Mantém o botão do mouse premido e arrasta. A primeira célula clicada define a ação para todas as células seguintes.
+  * **Arrastar (Drag):** Mantém o botão do rato premido e arrasta. A primeira célula clicada define a ação para todas as células seguintes.
 
 ### 📱 Interação por Toque (Mobile)
 
