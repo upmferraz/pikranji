@@ -10,6 +10,8 @@ Neste jogo, a imagem oculta é sempre um **Kanji** (caractere japonês), e o seu
 
 Para vencer, deve preencher corretamente as células da grelha de 15x15, seguindo as pistas numéricas fornecidas nas laterais e no topo.
 
+Este jogo tem principalmente um objetivo didático, que é o de uma forma gamificada, aprender os milhares de caracteres Kanji existentes. Sinta-se livre em adicionar os que não estão incluídos com recurso ao gerador.
+
 -----
 
 ## 🔍 Como Jogar
