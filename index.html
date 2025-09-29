@@ -376,6 +376,8 @@
                 hideWinModal();
                 
                 createMiniMap(); 
+                // CORREÇÃO APLICADA
+                hideMiniMap();
             }
             
             // NOVO: Função para verificar se as pistas estão resolvidas
@@ -588,6 +590,7 @@
                 renderGrid(puzzleToReload.grid, rowClues, colClues);
                 hideWinModal();
                 createMiniMap(); 
+                hideMiniMap(); // Garantir que está escondido no reset
                 checkClueCompletion(); // Chamar após o render para garantir que as classes de pista sejam limpas
             });
             
