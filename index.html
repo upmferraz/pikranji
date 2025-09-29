@@ -26,6 +26,13 @@
         .clue-cell { color: #4b5563; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 4px; text-align: center; font-size: 0.75rem; }
         .clues-top .clue-cell { flex-direction: column; padding: 4px 0; width: 100%; }
         .clues-left .clue-cell { padding: 0 4px; height: 100%; }
+        /* NOVO ESTILO: Para Pistas Concluídas */
+        .clue-cell.completed span {
+            color: #9ca3af; /* Cinzento mais claro */
+            text-decoration: line-through; /* Riscar o número */
+            opacity: 0.7;
+        }
+
         .game-grid { grid-column: 2 / 3; grid-row: 2 / 3; display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr); gap: 0px; border-top: 1px solid #d1d5db; border-left: 1px solid #d1d5db; }
         .cell {
             width: 100%; height: 100%; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db;
@@ -144,11 +151,25 @@
             let currentGrid = [];
             const gridSize = 15;
             let currentTool = 'fill';
+            
+            // Variáveis de Interação Atualizadas
             let isDragging = false;
+            let isTap = false; 
+            let tapCell = null; 
             let cells;
             let dragTargetState = null; 
+            
+            // NOVAS VARIÁVEIS PARA LONG PRESS
+            let pressTimeout = null;
+            let longPressExecuted = false; 
 
             // =========================================================================
+            // VARIÁVEIS PARA PISTAS E ESTADO DO JOGO
+            // =========================================================================
+            let userGrid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0)); // 0: vazio, 1: preenchido, 2: marcado (X)
+            let currentPuzzleClues = { rowClues: [], colClues: [] }; 
+            // =========================================================================
+
             // LÓGICA DE CARREGAMENTO DO JSON EXTERNO (Corrigida)
             // =========================================================================
             try {
@@ -243,12 +264,18 @@
             function renderGrid(grid, rowClues, colClues) {
                 board.innerHTML = '';
                 
+                // NOVO: Guardar as pistas e re-inicializar a grelha do utilizador
+                currentPuzzleClues.rowClues = rowClues;
+                currentPuzzleClues.colClues = colClues;
+                userGrid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
+                
                 const clueTopContainer = document.createElement('div');
                 clueTopContainer.className = `clues-top grid grid-cols-${gridSize}`;
                 clueTopContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
-                colClues.forEach(clueSet => {
+                colClues.forEach((clueSet, index) => { // Adicionar 'index'
                     const clueDiv = document.createElement('div');
                     clueDiv.className = 'clue-cell';
+                    clueDiv.dataset.colIndex = index; // Adicionar dataset para identificação
                     clueDiv.innerHTML = clueSet.map(c => `<span>${c}</span>`).join('<br>');
                     clueTopContainer.appendChild(clueDiv);
                 });
@@ -257,9 +284,10 @@
                 const clueLeftContainer = document.createElement('div');
                 clueLeftContainer.className = `clues-left grid grid-rows-${gridSize}`;
                 clueLeftContainer.style.gridTemplateRows = `repeat(${gridSize}, 1fr)`;
-                rowClues.forEach(clueSet => {
+                rowClues.forEach((clueSet, index) => { // Adicionar 'index'
                     const clueDiv = document.createElement('div');
                     clueDiv.className = 'clue-cell';
+                    clueDiv.dataset.rowIndex = index; // Adicionar dataset para identificação
                     clueDiv.innerHTML = clueSet.map(c => `<span>${c}</span>`).join('&nbsp;');
                     clueLeftContainer.appendChild(clueDiv);
                 });
@@ -280,6 +308,8 @@
                 }
                 board.appendChild(gameGrid);
                 cells = gameGrid.querySelectorAll('.cell');
+                
+                checkClueCompletion(); // Verificar logo após o render (estado inicial vazio)
             }
             
             function checkWin() {
@@ -310,28 +340,27 @@
                 winModal.querySelector('div').style.transform = 'scale(0.95)';
             }
             
-            // CORRIGIDO: Esta função agora aplica a solução ao DOM do tabuleiro principal
+            // CORRIGIDO: Aplica a solução ao DOM e atualiza userGrid
             function solvePuzzle() {
                 cells.forEach(cell => {
                     const r = parseInt(cell.dataset.row); 
                     const c = parseInt(cell.dataset.col);
                     
-                    // Limpa quaisquer estados anteriores
                     cell.classList.remove('filled');
                     cell.classList.remove('marked');
 
                     if (currentGrid[r][c] === 1) {
-                        // Preenche se for parte da solução
                         cell.classList.add('filled');
-                        updateMiniMap(r, c, true);
+                        userGrid[r][c] = 1; // Atualiza userGrid para preenchido
                     } else {
-                        // Marca com 'X' se não for (mas não está preenchido)
                         cell.classList.add('marked');
-                        updateMiniMap(r, c, false); 
+                        userGrid[r][c] = 2; // Atualiza userGrid para marcado (X)
                     }
+                    updateMiniMap(r, c, currentGrid[r][c] === 1);
                 });
                 
-                // Verifica a vitória após a solução
+                checkClueCompletion(); // Verificar o estado das pistas após a solução
+                
                 if (checkWin()) { 
                     showWinModal(); 
                 }
@@ -349,9 +378,78 @@
                 createMiniMap(); 
             }
             
-            // Lógica de Interação Touch/Mouse (Mantida)
+            // NOVO: Função para verificar se as pistas estão resolvidas
+            function checkClueCompletion() {
+                const clueTopCells = document.querySelectorAll('.clues-top .clue-cell');
+                const clueLeftCells = document.querySelectorAll('.clues-left .clue-cell');
+
+                // Função auxiliar para gerar pistas a partir do estado atual da grelha de uma dimensão
+                const getCluesFromState = (stateArray) => {
+                    let clues = []; 
+                    let count = 0;
+                    // Considera apenas as células preenchidas (1)
+                    for (let cellState of stateArray) { 
+                        if (cellState === 1) { 
+                            count++; 
+                        } else { 
+                            if (count > 0) { 
+                                clues.push(count); 
+                            } 
+                            count = 0; 
+                        } 
+                    }
+                    if (count > 0) { 
+                        clues.push(count); 
+                    } 
+                    return clues.length > 0 ? clues : [0];
+                };
+                
+                // === 1. Verificar Pistas das LINHAS (Clues Left) ===
+                currentPuzzleClues.rowClues.forEach((originalClues, r) => {
+                    const rowState = userGrid[r];
+                    const currentClues = getCluesFromState(rowState);
+                    
+                    const isComplete = JSON.stringify(originalClues) === JSON.stringify(currentClues);
+
+                    const clueCell = Array.from(clueLeftCells).find(c => parseInt(c.dataset.rowIndex) === r);
+                    if (clueCell) {
+                        if (isComplete) {
+                            clueCell.classList.add('completed');
+                        } else {
+                            clueCell.classList.remove('completed');
+                        }
+                    }
+                });
+
+                // === 2. Verificar Pistas das COLUNAS (Clues Top) ===
+                currentPuzzleClues.colClues.forEach((originalClues, c) => {
+                    const colState = [];
+                    for (let r = 0; r < gridSize; r++) {
+                        colState.push(userGrid[r][c]);
+                    }
+                    const currentClues = getCluesFromState(colState);
+                    
+                    const isComplete = JSON.stringify(originalClues) === JSON.stringify(currentClues);
+
+                    const clueCell = Array.from(clueTopCells).find(clue => parseInt(clue.dataset.colIndex) === c);
+                    if (clueCell) {
+                        if (isComplete) {
+                            clueCell.classList.add('completed');
+                        } else {
+                            clueCell.classList.remove('completed');
+                        }
+                    }
+                });
+            }
+
+
+            // Lógica de Interação Touch/Mouse (CORRIGIDA)
             function handleCellInteraction(cell) {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+                
                 if (dragTargetState === null) {
+                    // Define a ação (preencher/apagar ou marcar/desmarcar) apenas na primeira interação
                     if (currentTool === 'fill') {
                         dragTargetState = cell.classList.contains('filled') ? 'erase' : 'fill';
                     } else {
@@ -365,17 +463,21 @@
                     if (dragTargetState === 'fill') {
                         cell.classList.add('filled'); cell.classList.remove('marked');
                         isFilled = true;
+                        userGrid[r][c] = 1; // Preenchido
                     } else { 
                         cell.classList.remove('filled'); cell.classList.remove('marked');
                         isFilled = false;
+                        userGrid[r][c] = 0; // Vazio
                     }
                 } else { 
                     if (dragTargetState === 'mark') {
                         cell.classList.add('marked'); cell.classList.remove('filled');
                         isFilled = false;
+                        userGrid[r][c] = 2; // Marcado (X)
                     } else { 
                         cell.classList.remove('marked'); cell.classList.remove('filled');
                         isFilled = false;
+                        userGrid[r][c] = 0; // Vazio
                     }
                 }
 
@@ -386,47 +488,92 @@
                         isFilled 
                     );
                 }
+                
+                checkClueCompletion(); // Verificar o estado das pistas após a interação
             }
             
-            // MOUSE EVENTS
+            // MOUSE EVENTS (Funcionam corretamente para clique e arrasto)
             board.addEventListener('mousedown', (e) => {
                 if (e.target.classList.contains('cell')) {
                     isDragging = true; dragTargetState = null; 
                     handleCellInteraction(e.target);
                 }
             });
-            board.addEventListener('mouseup', () => { isDragging = false; dragTargetState = null; hideMiniMap(); if (checkWin()) { showWinModal(); } });
+            board.addEventListener('mouseup', () => { 
+                isDragging = false; 
+                dragTargetState = null; 
+                hideMiniMap(); 
+                if (checkWin()) { showWinModal(); } 
+            });
             board.addEventListener('mouseover', (e) => {
                 if (isDragging && e.target.classList.contains('cell')) {
                     handleCellInteraction(e.target);
                 }
             });
             
-            // TOUCH EVENTS
+            // TOUCH EVENTS (CORRIGIDOS para taps E long press)
             board.addEventListener('touchstart', (e) => {
                 if (e.target.classList.contains('cell') && e.touches.length === 1) { 
                      e.preventDefault(); 
+                     
+                     // 1. Configurar estado inicial
                      isDragging = true;
-                     dragTargetState = null; 
-                     handleCellInteraction(e.target);
+                     isTap = true;
+                     longPressExecuted = false; // Reset
+                     tapCell = e.target;
+                     dragTargetState = null;
+
+                     // 2. Tentar executar a interação como "long press" após 500ms
+                     if (pressTimeout) clearTimeout(pressTimeout);
+                     pressTimeout = setTimeout(() => {
+                         if (isTap && !longPressExecuted) { // Verifica se ainda é um tap e a ação não foi feita
+                            handleCellInteraction(tapCell);
+                            longPressExecuted = true;
+                         }
+                         // O touchend fará o checkWin, não o fazemos aqui.
+                     }, 500); // 500ms para long press
                 }
             });
 
             board.addEventListener('touchend', () => {
+                // 1. Limpar timeout
+                if (pressTimeout) {
+                    clearTimeout(pressTimeout);
+                    pressTimeout = null;
+                }
+                
+                // 2. Executar apenas se foi um quick tap e a ação ainda não foi executada (não foi drag nem long press)
+                if (isTap && tapCell && !longPressExecuted) { 
+                     handleCellInteraction(tapCell);
+                }
+
+                // 3. Resetar estados
                 isDragging = false;
+                isTap = false;
+                longPressExecuted = false;
                 dragTargetState = null;
+                tapCell = null;
                 hideMiniMap(); 
                 if (checkWin()) { showWinModal(); }
             });
 
             board.addEventListener('touchmove', (e) => {
                 if (isDragging) {
+                    // 1. Limpar timeout, pois é um arrasto
+                    if (pressTimeout) {
+                        clearTimeout(pressTimeout);
+                        pressTimeout = null;
+                    }
+
+                    isTap = false; // Não é um toque
+                    longPressExecuted = false; // Se arrastou, não é long press
+
                     e.preventDefault(); 
                     const touch = e.touches[0];
                     const target = document.elementFromPoint(touch.clientX, touch.clientY);
                     
                     if (target && target.classList.contains('cell')) {
-                        handleCellInteraction(target);
+                        handleCellInteraction(target); // Executa a ação imediatamente durante o arrasto
                     }
                 }
             });
@@ -441,6 +588,7 @@
                 renderGrid(puzzleToReload.grid, rowClues, colClues);
                 hideWinModal();
                 createMiniMap(); 
+                checkClueCompletion(); // Chamar após o render para garantir que as classes de pista sejam limpas
             });
             
             solveBtn.addEventListener('click', solvePuzzle);
