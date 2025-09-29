@@ -2,105 +2,82 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Pikranji - The Kanji Picross</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            touch-action: manipulation;
+        /* Estilos Base e Otimizações de Tamanho */
+        body { font-family: 'Inter', sans-serif; touch-action: manipulation; overflow: auto; }
+        
+        .board-container { 
+            width: 90vw; 
+            height: 90vw; 
+            max-width: 600px; 
+            max-height: 600px; 
+            display: grid; 
+            grid-template-columns: min-content 1fr; 
+            grid-template-rows: min-content 1fr; 
+            gap: 0px; 
+            touch-action: none; 
         }
-        .board-container {
-            display: grid;
-            grid-template-columns: min-content 1fr;
-            grid-template-rows: min-content 1fr;
-            gap: 2px;
-            width: 80vw;
-            height: 80vw;
-            max-width: 600px;
-            max-height: 600px;
-        }
-        .clues-top {
-            grid-column: 2 / 3;
-            grid-row: 1 / 2;
-            display: flex;
-            justify-content: space-around;
-        }
-        .clues-left {
-            grid-column: 1 / 2;
-            grid-row: 2 / 3;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-around;
-            align-items: flex-end;
-        }
-        .clue-cell {
-            color: #4b5563;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 4px;
-            text-align: center;
-            font-size: 0.75rem;
-        }
-        .clues-top .clue-cell {
-            flex-direction: column;
-            padding: 4px 0;
-            width: 100%;
-        }
-        .clues-left .clue-cell {
-            padding: 0 4px;
-            height: 100%;
-        }
-        .game-grid {
-            grid-column: 2 / 3;
-            grid-row: 2 / 3;
-            display: grid;
-            grid-template-columns: repeat(15, 1fr);
-            grid-template-rows: repeat(15, 1fr);
-            gap: 1px;
-            border: 1px solid #d1d5db;
-        }
+
+        .clues-top { grid-column: 2 / 3; grid-row: 1 / 2; display: flex; justify-content: space-around; }
+        .clues-left { grid-column: 1 / 2; grid-row: 2 / 3; display: flex; flex-direction: column; justify-content: space-around; align-items: flex-end; }
+        .clue-cell { color: #4b5563; font-weight: 600; display: flex; align-items: center; justify-content: center; padding: 0 4px; text-align: center; font-size: 0.75rem; }
+        .clues-top .clue-cell { flex-direction: column; padding: 4px 0; width: 100%; }
+        .clues-left .clue-cell { padding: 0 4px; height: 100%; }
+        .game-grid { grid-column: 2 / 3; grid-row: 2 / 3; display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr); gap: 0px; border-top: 1px solid #d1d5db; border-left: 1px solid #d1d5db; }
         .cell {
-            width: 100%;
-            height: 100%;
-            border: 1px solid #d1d5db;
-            background-color: #f3f4f6;
-            cursor: pointer;
-            transition: background-color 0.1s ease-in-out;
-            -webkit-tap-highlight-color: transparent;
+            width: 100%; height: 100%; border-right: 1px solid #d1d5db; border-bottom: 1px solid #d1d5db;
+            background-color: #f3f4f6; cursor: pointer; transition: background-color 0.1s;
+            -webkit-tap-highlight-color: transparent; touch-action: none;
         }
-        .cell.filled {
-            background-color: #374151;
-            border-color: #374151;
+        .cell.filled { background-color: #374151; border-color: #374151; }
+        .cell.marked::before { content: '×'; color: #9ca3af; display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 0.6em; line-height: 1; }
+        .control-btn.active { background-color: #4f46e5; color: white; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+        
+        /* MINI-MAPA (Mantido) */
+        #mini-map-container {
+            position: fixed; top: 10px; right: 10px; width: 150px; height: 150px; background-color: white;
+            border: 3px solid #4f46e5; border-radius: 8px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            z-index: 900; overflow: hidden; opacity: 0; transition: opacity 0.2s ease-in-out;
         }
-        .cell.marked::before {
-            content: '×';
-            color: #9ca3af;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            height: 100%;
-            font-size: 0.6em;
-            line-height: 1;
+        #mini-map-grid {
+            display: grid; grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr);
+            width: 100%; height: 100%; gap: 0px; 
         }
-        .control-btn.active {
-            background-color: #4f46e5;
-            color: white;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-        }
-        @media (max-width: 640px) {
-            .board-container {
-                width: 90vw;
-                height: 90vw;
+        .mini-cell { background-color: #f3f4f6; border: 0.5px solid #d1d5db; transition: background-color 0.1s; }
+        .mini-filled { background-color: #374151 !important; border-color: #374151 !important; }
+        .mini-highlight { outline: 2px solid red; outline-offset: -2px; }
+
+        @media (min-width: 600px) { #mini-map-container { display: none !important; } }
+
+        /* OTIMIZAÇÕES PARA TELEMÓVEIS (TAMANHO MÁXIMO DO QUADRO) */
+        @media (max-width: 480px) {
+            .board-container { 
+                width: 98vw; 
+                height: 98vw; 
+                gap: 0px; 
             }
+            .clue-cell { 
+                /* Fonte das pistas reduzida ao máximo */
+                font-size: 0.35rem; 
+                padding: 0 1px; 
+            }
+            .clues-top .clue-cell { padding: 0px 0; }
+            .clues-left .clue-cell { padding: 0 0px; }
+            .cell.marked::before { font-size: 1.2em; }
+            .control-btn, #reset-btn, #solve-btn, #next-btn, #modal-next-btn { padding: 0.7rem 1.4rem; font-size: 1rem; }
+            #controls { gap: 0.5rem; }
         }
     </style>
 </head>
-<body class="bg-stone-100 text-stone-800 flex flex-col items-center justify-center min-h-screen p-4">
+<body class="bg-stone-100 p-4">
 
+    <div id="mini-map-container" style="opacity: 0;">
+        <div id="mini-map-grid"></div>
+    </div>
+    
     <div id="app-container" class="w-full max-w-4xl mx-auto flex flex-col items-center">
         
         <header class="text-center mb-6">
@@ -160,73 +137,112 @@
             const modalNextBtn = document.getElementById('modal-next-btn');
             const winKanji = document.getElementById('win-kanji');
             const winMeaning = document.getElementById('win-meaning');
+            
+            const miniMapContainer = document.getElementById('mini-map-container');
 
-            let puzzles = [];
+            let puzzles = []; 
             let currentGrid = [];
             const gridSize = 15;
             let currentTool = 'fill';
             let isDragging = false;
             let cells;
+            let dragTargetState = null; 
 
-            // Carrega os dados dos puzzles a partir do ficheiro JSON
+            // =========================================================================
+            // LÓGICA DE CARREGAMENTO DO JSON EXTERNO (Corrigida)
+            // =========================================================================
             try {
                 const response = await fetch('puzzles.json');
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    throw new Error(`Erro HTTP! Status: ${response.status}. Certifique-se de que 'puzzles.json' existe.`);
                 }
+                
                 puzzles = await response.json();
-                loadRandomPuzzle(); // Inicia com um puzzle aleatório
+
+                if (puzzles.length === 0) {
+                     throw new Error("O ficheiro 'puzzles.json' está vazio.");
+                }
+
+                loadRandomPuzzle();
             } catch (error) {
-                console.error("Could not load puzzles.json:", error);
-                document.getElementById('app-container').innerHTML = '<p class="text-red-500 text-center">Erro ao carregar os puzzles. Por favor, tente novamente.</p>';
-                return;
+                console.error("Erro ao carregar os puzzles:", error);
+                
+                document.getElementById('game-board-container').innerHTML = 
+                    '<div class="text-red-600 p-4 border border-red-300 bg-red-50 rounded-lg text-center mx-auto mt-10">' +
+                    '<h3 class="font-bold text-lg mb-2">ERRO DE CARREGAMENTO</h3>' +
+                    '<p>Não foi possível carregar os puzzles. Por favor, verifique:</p>' +
+                    '<ul class="list-disc list-inside mt-2 text-left mx-auto max-w-sm">' +
+                    '<li>Se o ficheiro <code class="font-mono bg-red-100 p-0.5 rounded">puzzles.json</code> existe na mesma pasta.</li>' +
+                    '<li>Se está a executar o código num <strong>servidor local</strong> (Ex: Live Server do VS Code).</li>' +
+                    '</ul></div>';
+                
+                document.getElementById('kanji-info').style.display = 'none';
+                document.getElementById('controls').style.display = 'none';
+                return; 
             }
+            // =========================================================================
+
+
+            // FUNÇÕES DO MINI-MAPA (Mantidas)
+            function createMiniMap() {
+                const miniMapGrid = document.getElementById('mini-map-grid');
+                miniMapGrid.innerHTML = ''; 
+                for (let r = 0; r < gridSize; r++) {
+                    for (let c = 0; c < gridSize; c++) {
+                        const miniCell = document.createElement('div');
+                        miniCell.className = 'mini-cell';
+                        miniCell.dataset.row = r;
+                        miniCell.dataset.col = c;
+                        miniMapGrid.appendChild(miniCell);
+                    }
+                }
+            }
+
+            function updateMiniMap(r, c, isFilled) {
+                const miniCells = document.getElementById('mini-map-grid').children;
+                const index = r * gridSize + c;
+                const miniCell = miniCells[index];
+                miniCell.classList.remove('mini-filled');
+                if (isFilled) {
+                    miniCell.classList.add('mini-filled');
+                }
+                
+                const currentHighlight = document.querySelector('.mini-highlight');
+                if (currentHighlight) {
+                     currentHighlight.classList.remove('mini-highlight');
+                }
+                miniCell.classList.add('mini-highlight');
+                miniMapContainer.style.opacity = '1';
+            }
+
+            function hideMiniMap() {
+                miniMapContainer.style.opacity = '0';
+                const currentHighlight = document.querySelector('.mini-highlight');
+                if (currentHighlight) {
+                     currentHighlight.classList.remove('mini-highlight');
+                }
+            }
+
 
             function generateClues(grid) {
                 const rowClues = grid.map(row => {
-                    let clues = [];
-                    let count = 0;
-                    for (let cell of row) {
-                        if (cell === 1) {
-                            count++;
-                        } else {
-                            if (count > 0) {
-                                clues.push(count);
-                            }
-                            count = 0;
-                        }
-                    }
-                    if (count > 0) {
-                        clues.push(count);
-                    }
-                    return clues.length > 0 ? clues : [0];
+                    let clues = []; let count = 0;
+                    for (let cell of row) { if (cell === 1) { count++; } else { if (count > 0) { clues.push(count); } count = 0; } }
+                    if (count > 0) { clues.push(count); } return clues.length > 0 ? clues : [0];
                 });
-
                 const colClues = [];
                 for (let c = 0; c < gridSize; c++) {
-                    let clues = [];
-                    let count = 0;
-                    for (let r = 0; r < gridSize; r++) {
-                        if (grid[r][c] === 1) {
-                            count++;
-                        } else {
-                            if (count > 0) {
-                                clues.push(count);
-                            }
-                            count = 0;
-                        }
-                    }
-                    if (count > 0) {
-                        clues.push(count);
-                    }
-                    colClues.push(clues.length > 0 ? clues : [0]);
+                    let clues = []; let count = 0;
+                    for (let r = 0; r < gridSize; r++) { if (grid[r][c] === 1) { count++; } else { if (count > 0) { clues.push(count); } count = 0; } }
+                    if (count > 0) { clues.push(count); } colClues.push(clues.length > 0 ? clues : [0]);
                 }
                 return { rowClues, colClues };
             }
 
             function renderGrid(grid, rowClues, colClues) {
                 board.innerHTML = '';
-
+                
                 const clueTopContainer = document.createElement('div');
                 clueTopContainer.className = `clues-top grid grid-cols-${gridSize}`;
                 clueTopContainer.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
@@ -265,21 +281,7 @@
                 board.appendChild(gameGrid);
                 cells = gameGrid.querySelectorAll('.cell');
             }
-
-            function solvePuzzle() {
-                for (let i = 0; i < cells.length; i++) {
-                    const r = cells[i].dataset.row;
-                    const c = cells[i].dataset.col;
-                    if (currentGrid[r][c] === 1) {
-                        cells[i].classList.add('filled');
-                        cells[i].classList.remove('marked');
-                    } else {
-                        cells[i].classList.remove('filled');
-                        cells[i].classList.remove('marked');
-                    }
-                }
-            }
-
+            
             function checkWin() {
                 for (let i = 0; i < cells.length; i++) {
                     const r = cells[i].dataset.row;
@@ -295,20 +297,46 @@
             }
 
             function showWinModal() {
-                const currentPuzzle = puzzles.find(p => JSON.stringify(p.grid) === JSON.stringify(currentGrid));
-                winKanji.textContent = currentPuzzle.kanji;
-                winMeaning.textContent = currentPuzzle.meaning;
-                winModal.classList.remove('opacity-0', 'pointer-events-none');
-                winModal.querySelector('.bg-white').classList.remove('scale-95');
-                cells.forEach(cell => cell.style.pointerEvents = 'none');
+                 const currentPuzzle = puzzles.find(p => JSON.stringify(p.grid) === JSON.stringify(currentGrid));
+                 winKanji.textContent = currentPuzzle.kanji;
+                 winMeaning.textContent = currentPuzzle.meaning;
+                 winModal.style.opacity = '1';
+                 winModal.style.pointerEvents = 'auto';
+                 winModal.querySelector('div').style.transform = 'scale(1)';
             }
-
             function hideWinModal() {
-                winModal.classList.add('opacity-0', 'pointer-events-none');
-                winModal.querySelector('.bg-white').classList.add('scale-95');
-                cells.forEach(cell => cell.style.pointerEvents = 'auto');
+                winModal.style.opacity = '0';
+                winModal.style.pointerEvents = 'none';
+                winModal.querySelector('div').style.transform = 'scale(0.95)';
             }
+            
+            // CORRIGIDO: Esta função agora aplica a solução ao DOM do tabuleiro principal
+            function solvePuzzle() {
+                cells.forEach(cell => {
+                    const r = parseInt(cell.dataset.row); 
+                    const c = parseInt(cell.dataset.col);
+                    
+                    // Limpa quaisquer estados anteriores
+                    cell.classList.remove('filled');
+                    cell.classList.remove('marked');
 
+                    if (currentGrid[r][c] === 1) {
+                        // Preenche se for parte da solução
+                        cell.classList.add('filled');
+                        updateMiniMap(r, c, true);
+                    } else {
+                        // Marca com 'X' se não for (mas não está preenchido)
+                        cell.classList.add('marked');
+                        updateMiniMap(r, c, false); 
+                    }
+                });
+                
+                // Verifica a vitória após a solução
+                if (checkWin()) { 
+                    showWinModal(); 
+                }
+            }
+            
             function loadRandomPuzzle() {
                 const randomIndex = Math.floor(Math.random() * puzzles.length);
                 const puzzle = puzzles[randomIndex];
@@ -317,92 +345,105 @@
                 const { rowClues, colClues } = generateClues(currentGrid);
                 renderGrid(currentGrid, rowClues, colClues);
                 hideWinModal();
+                
+                createMiniMap(); 
             }
+            
+            // Lógica de Interação Touch/Mouse (Mantida)
+            function handleCellInteraction(cell) {
+                if (dragTargetState === null) {
+                    if (currentTool === 'fill') {
+                        dragTargetState = cell.classList.contains('filled') ? 'erase' : 'fill';
+                    } else {
+                        dragTargetState = cell.classList.contains('marked') ? 'unmark' : 'mark';
+                    }
+                }
 
+                let isFilled = cell.classList.contains('filled');
+                
+                if (currentTool === 'fill') {
+                    if (dragTargetState === 'fill') {
+                        cell.classList.add('filled'); cell.classList.remove('marked');
+                        isFilled = true;
+                    } else { 
+                        cell.classList.remove('filled'); cell.classList.remove('marked');
+                        isFilled = false;
+                    }
+                } else { 
+                    if (dragTargetState === 'mark') {
+                        cell.classList.add('marked'); cell.classList.remove('filled');
+                        isFilled = false;
+                    } else { 
+                        cell.classList.remove('marked'); cell.classList.remove('filled');
+                        isFilled = false;
+                    }
+                }
+
+                if (currentTool === 'fill' || (currentTool === 'mark' && dragTargetState !== 'mark')) {
+                     updateMiniMap(
+                        parseInt(cell.dataset.row), 
+                        parseInt(cell.dataset.col), 
+                        isFilled 
+                    );
+                }
+            }
+            
+            // MOUSE EVENTS
             board.addEventListener('mousedown', (e) => {
                 if (e.target.classList.contains('cell')) {
-                    isDragging = true;
+                    isDragging = true; dragTargetState = null; 
                     handleCellInteraction(e.target);
                 }
             });
-
-            board.addEventListener('mouseup', () => {
-                isDragging = false;
-                if (checkWin()) {
-                    showWinModal();
-                }
-            });
-
+            board.addEventListener('mouseup', () => { isDragging = false; dragTargetState = null; hideMiniMap(); if (checkWin()) { showWinModal(); } });
             board.addEventListener('mouseover', (e) => {
                 if (isDragging && e.target.classList.contains('cell')) {
                     handleCellInteraction(e.target);
                 }
             });
-
+            
+            // TOUCH EVENTS
             board.addEventListener('touchstart', (e) => {
-                const touch = e.touches[0];
-                const target = document.elementFromPoint(touch.clientX, touch.clientY);
-                if (target && target.classList.contains('cell')) {
-                    isDragging = true;
-                    handleCellInteraction(target);
+                if (e.target.classList.contains('cell') && e.touches.length === 1) { 
+                     e.preventDefault(); 
+                     isDragging = true;
+                     dragTargetState = null; 
+                     handleCellInteraction(e.target);
                 }
             });
 
             board.addEventListener('touchend', () => {
                 isDragging = false;
-                if (checkWin()) {
-                    showWinModal();
-                }
+                dragTargetState = null;
+                hideMiniMap(); 
+                if (checkWin()) { showWinModal(); }
             });
 
             board.addEventListener('touchmove', (e) => {
                 if (isDragging) {
+                    e.preventDefault(); 
                     const touch = e.touches[0];
                     const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                    
                     if (target && target.classList.contains('cell')) {
                         handleCellInteraction(target);
                     }
                 }
             });
-
-            function handleCellInteraction(cell) {
-                if (currentTool === 'fill') {
-                    cell.classList.toggle('filled');
-                    cell.classList.remove('marked');
-                } else {
-                    cell.classList.toggle('marked');
-                    cell.classList.remove('filled');
-                }
-            }
-
-            fillBtn.addEventListener('click', () => {
-                currentTool = 'fill';
-                fillBtn.classList.add('active');
-                markBtn.classList.remove('active');
-            });
-
-            markBtn.addEventListener('click', () => {
-                currentTool = 'mark';
-                markBtn.classList.add('active');
-                fillBtn.classList.remove('active');
-            });
-
-            resetBtn.addEventListener('click', () => {
-                // Reinicia o puzzle atual, não carrega um novo
+            
+            // Controles de botão
+            fillBtn.addEventListener('click', () => { currentTool = 'fill'; fillBtn.classList.add('active'); markBtn.classList.remove('active'); });
+            markBtn.addEventListener('click', () => { currentTool = 'mark'; markBtn.classList.add('active'); fillBtn.classList.remove('active'); });
+            
+            resetBtn.addEventListener('click', () => { 
                 const puzzleToReload = puzzles.find(p => JSON.stringify(p.grid) === JSON.stringify(currentGrid));
                 const { rowClues, colClues } = generateClues(puzzleToReload.grid);
                 renderGrid(puzzleToReload.grid, rowClues, colClues);
                 hideWinModal();
+                createMiniMap(); 
             });
-
-            solveBtn.addEventListener('click', () => {
-                solvePuzzle();
-                if (checkWin()) {
-                    showWinModal();
-                }
-            });
-
-            // Chama a função para carregar um puzzle aleatório
+            
+            solveBtn.addEventListener('click', solvePuzzle);
             nextBtn.addEventListener('click', loadRandomPuzzle);
             modalNextBtn.addEventListener('click', loadRandomPuzzle);
         });
