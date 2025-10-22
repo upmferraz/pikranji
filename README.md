@@ -1,109 +1,106 @@
-# Pikranji - O Picross de Kanjis
+# Pikranji - The Kanji Picross
 
 -----
 
-## 🎯 Objetivo do Jogo
+## 🎯 Game Objective
 
-**Pikranji** é uma versão do popular jogo de lógica Picross (também conhecido como Nonogram ou Griddlers), onde o objetivo é revelar uma imagem oculta numa grelha.
+**Pikranji** is a version of the popular logic game Picross (also known as Nonogram or Griddlers), where the objective is to reveal a hidden image on a grid.
 
-Neste jogo, a imagem oculta é sempre um **Kanji** (caractere japonês), e o seu significado é apresentado logo abaixo da grelha para dar uma pista.
+In this game, the hidden image is always a **Kanji** (Japanese character), and its meaning is displayed just below the grid to provide a hint.
 
-Para vencer, deve preencher corretamente as células da grelha de 15x15, seguindo as pistas numéricas fornecidas nas laterais e no topo.
+To win, you must correctly fill in the cells of the 15x15 grid, following the numerical clues provided on the sides and at the top.
 
-Este jogo tem principalmente um objetivo didático, que é o de uma forma gamificada, aprender os milhares de caracteres Kanji existentes. Sinta-se livre em adicionar os que não estão incluídos com recurso ao gerador.
+This game primarily has an educational objective, which is to learn the thousands of existing Kanji characters in a gamified way. Feel free to add those that are not included using the generator.
 
 -----
 
-## 🔍 Como Jogar
+## 🔍 How to Play
 
-O tabuleiro é composto por uma grelha central e duas áreas de pistas:
+The board is composed of a central grid and two clue areas:
 
-  * **Pistas Laterais (Esquerda):** Indicam o número e o tamanho dos blocos de células preenchidas (pretas) em cada **linha**.
-  * **Pistas Superiores (Topo):** Indicam o número e o tamanho dos blocos de células preenchidas (pretas) em cada **coluna**.
+* **Side Clues (Left):** Indicate the number and size of the blocks of filled (black) cells in each **row**.
+* **Top Clues (Top):** Indicate the number and size of the blocks of filled (black) cells in each **column**.
 
-**Exemplo:**
-Se uma pista de linha for `[3 5 1]`, isso significa que essa linha contém:
+**Example:**
+If a row clue is `[3 5 1]`, this means that row contains:
 
-1.  Um bloco de 3 células preenchidas.
-2.  Pelo menos uma célula vazia/marcada.
-3.  Um bloco de 5 células preenchidas.
-4.  Pelo menos uma célula vazia/marcada.
-5.  Um bloco de 1 célula preenchida.
+1.  A block of 3 filled cells.
+2.  At least one empty/marked cell.
+3.  A block of 5 filled cells.
+4.  At least one empty/marked cell.
+5.  A block of 1 filled cell.
 
-### 🛠️ Modos de Interação (Ferramentas)
+### 🛠️ Interaction Modes (Tools)
 
-Pode alternar entre duas ferramentas usando os botões **`⬛` (Preencher)** e **`❌` (Marcar)**:
+You can switch between two tools using the **`⬛` (Fill)** and **`❌` (Mark)** buttons:
 
-| Ferramenta | Ícone | Uso Principal |
+| Tool | Icon | Main Use |
 | :--- | :--- | :--- |
-| **Preencher** | `⬛` | Marca uma célula como preenchida (cor preta). |
-| **Marcar** | `❌` | Marca uma célula com um **`×`** (para indicar que deve ficar vazia). |
+| **Fill** | `⬛` | Marks a cell as filled (black color). |
+| **Mark** | `❌` | Marks a cell with an **`×`** (to indicate it should remain empty). |
 
-### 🖱️ Interação por Rato
+### 🖱️ Mouse Interaction
 
-  * **Clique Rápido:** Alterna o estado da célula (toggle) de acordo com a ferramenta selecionada.
-  * **Arrastar (Drag):** Mantém o botão do rato premido e arrasta. A primeira célula clicada define a ação para todas as células seguintes.
+* **Quick Click:** Toggles the cell's state according to the selected tool.
+* **Drag:** Holds the mouse button down and drags. The first cell clicked defines the action for all subsequent cells.
 
-### 📱 Interação por Toque (Mobile)
+### 📱 Touch Interaction (Mobile)
 
-  * **Toque Rápido (Tap):** Ativa o modo de alternância (toggle) na célula, de acordo com a ferramenta selecionada.
-  * **Arrastar (Drag/Swipe):** O movimento imediato após o toque ativa o modo de arrasto para preencher/marcar várias células.
-  * **Toque Demorado (Long Press - \~0.5s):** Funciona como um toque rápido (toggle), útil para garantir que um toque mais lento seja registado.
+* **Quick Tap (Tap):** Activates toggle mode on the cell, according to the selected tool.
+* **Drag (Drag/Swipe):** The immediate movement after the tap activates drag mode to fill/mark multiple cells.
+* **Long Press (\~0.5s):** Works like a quick tap (toggle), useful for ensuring a slower tap is registered.
 
-### Botões de Controlo
+### Control Buttons
 
-  * **Reiniciar:** Limpa a grelha atual e volta ao estado inicial, mantendo o mesmo Kanji.
-  * **Resolver:** Revela a solução correta (pode ser usado como último recurso\!).
-  * **Próximo Kanji:** Carrega um novo puzzle e um novo Kanji aleatório.
-
------
-
-## ✅ Pistas Concluídas
-
-Quando as células preenchidas numa linha ou coluna corresponderem exatamente aos números da pista dessa linha/coluna, as pistas numéricas serão riscadas, indicando que a linha/coluna está **concluída**.
-
-**O jogo termina e você vence** quando todas as linhas e colunas estiverem concluídas e a imagem do Kanji estiver totalmente revelada.
+* **Restart:** Clears the current grid and returns to the initial state, keeping the same Kanji.
+* **Solve:** Reveals the correct solution (can be used as a last resort!).
+* **Next Kanji:** Loads a new puzzle and a new random Kanji.
 
 -----
 
-## 🚀 Adicionar Novos Puzzles (Kanji)
+## ✅ Completed Clues
 
-Pode facilmente adicionar novos desafios ao jogo editando diretamente o ficheiro **`puzzles.json`**. Este ficheiro é um *Array* de objetos JSON, onde cada objeto representa um puzzle completo.
+When the filled cells in a row or column exactly match the clue numbers for that row/column, the numerical clues will be crossed out, indicating that the row/column is **completed**.
 
-### Estrutura de um Puzzle
+**The game ends and you win** when all rows and columns are completed and the Kanji image is fully revealed.
 
-Cada objeto de puzzle deve seguir o formato abaixo e ser anexado ao array principal:
+-----
 
-| Campo | Tipo | Descrição |
+## 🚀 Adding New Puzzles (Kanji)
+
+You can easily add new challenges to the game by directly editing the **`puzzles.json`** file. A great, free, and open-source text editor for this task is **Vim**. This file is an *Array* of JSON objects, where each object represents a complete puzzle. (you can also use the included generator)
+
+### Puzzle Structure
+
+Each puzzle object must follow the format below and be appended to the main array:
+
+| Field | Type | Description |
 | :--- | :--- | :--- |
-| `"kanji"` | String | O caractere japonês que será exibido. |
-| `"meaning"` | String | O significado do Kanji em Português. |
-| `"grid"` | Array (15x15) | A grelha de solução. Deve ser uma matriz de 15 por 15, onde **`1`** representa uma célula preenchida (preto) e **`0`** representa uma célula vazia. |
+| `"kanji"` | String | The Japanese character that will be displayed. |
+| `"meaning"` | String | The meaning of the Kanji. |
+| `"grid"` | Array (15x15) | The solution grid. Must be a 15 by 15 matrix, where **`1`** represents a filled cell (black) and **`0`** represents an empty cell. |
 
-### Exemplo de Código JSON
+### JSON Code Example
 
 ```json
 {
-                "kanji": "田",
-                "meaning": "Campo de Arroz",
-                "grid": [
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
-                        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
-                ]
+                "kanji": "田",
+                "meaning": "Rice Field",
+                "grid": [
+                        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+                      	[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+        	        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          	        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,0,0,0,0,1,0,0,0,0,1,0,0],
+          	        [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0],
+          	        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          	        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+          	        [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+  	          ]
 }
-```
-
-Basta garantir que a `grid` tem exatamente **15 linhas** e cada linha tem **15 valores**. O jogo irá calcular automaticamente as pistas a partir desta grelha de solução.
