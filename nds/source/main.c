@@ -3,57 +3,166 @@
 #include "puzzles.h"
 
 // ============================================================================
-// 🎨 ESTILO VISUAL "NINTENDO LITE"
+// 🎨 CORES & CONFIG
 // ============================================================================
-// Cores com bit 15 (Opacidade) ligado
-#define COLOR_BG        (RGB15(31, 31, 31) | BIT(15))  // Branco Puro
-#define COLOR_GRID      (RGB15(24, 24, 24) | BIT(15))  // Cinza Muito Claro
-#define COLOR_CLUE_TXT  (RGB15(10, 10, 10) | BIT(15))  // Cinza Escuro (Texto)
-#define COLOR_FILLED    (RGB15(5,  5,  5)  | BIT(15))  // Preto Suave (Preenchido)
-#define COLOR_MARKER    (RGB15(20, 0,  0)  | BIT(15))  // Vermelho Escuro (X)
-#define COLOR_CURSOR    (RGB15(0,  20, 31) | BIT(15))  // Azul Ciano (Cursor)
-#define COLOR_WIN_BG    (RGB15(25, 31, 25) | BIT(15))  // Verde Menta (Vitória)
+#define COLOR_BG        (RGB15(28, 29, 31) | BIT(15))
+#define COLOR_GRID      (RGB15(22, 23, 25) | BIT(15))
+#define COLOR_CLUE_TXT  (RGB15(5,  8,  12) | BIT(15))
+#define COLOR_CLUE_DONE (RGB15(20, 20, 20) | BIT(15))
+#define COLOR_FILLED    (RGB15(31, 10, 5)  | BIT(15))
+#define COLOR_MARKER    (RGB15(15, 15, 15) | BIT(15))
+#define COLOR_CURSOR    (RGB15(0,  25, 31) | BIT(15))
+#define COLOR_WIN_BG    (RGB15(22, 31, 22) | BIT(15))
 
-// Configuração da Grelha
 #define CELL_SIZE 10
 #define GRID_COLS 15
 #define GRID_ROWS 15
-// Espaço reservado para as pistas (Margem esquerda e topo)
 #define MARGIN_LEFT 60 
 #define MARGIN_TOP  40
+#define MAX_CLUES 8
 
-// Arrays globais
 u16* videoBuffer;
 int currentPuzzleIndex = 0;
 int playerGrid[GRID_ROWS][GRID_COLS];
 bool gameWon = false;
 
-// Estruturas para as Dicas
-#define MAX_CLUES 8
+bool rowDone[GRID_ROWS];
+bool colDone[GRID_COLS];
+
 typedef struct { int count; int values[MAX_CLUES]; } LineClues;
 LineClues rowClues[GRID_ROWS];
 LineClues colClues[GRID_COLS];
 
+// Variáveis de Input
+bool isDragging = false;
+int dragType = 0; 
+
 // ============================================================================
-// 🔊 ÁUDIO (PSG - Gameboy Style)
+// 🔊 GESTOR DE SOM (NOVO)
 // ============================================================================
+int soundChannel = -1; // Canal que está a tocar atualmente
+int soundTimer = 0;    // Contador para desligar o som
+
 void playSound(int type) {
-    // Canal, Duty Cycle (Timbre), Frequência (Agudo/Grave), Volume, Pan
-    if (type == 0) { // Click Pintar (Grave)
-        soundPlayPSG(DutyCycle_50, 400, 100, 64);
-    } else if (type == 1) { // Click Marcar (Agudo e curto)
-        soundPlayPSG(DutyCycle_25, 800, 80, 64);
-    } else if (type == 2) { // Vitória (Arpeggio simples manual)
-        soundPlayPSG(DutyCycle_50, 1000, 127, 64);
-    } else if (type == 3) { // Apagar
-        soundPlayPSG(DutyCycle_12, 200, 80, 64);
+    // 1. Se já houver um som a tocar, mata-o para não sobrepor
+    if (soundChannel != -1) {
+        soundKill(soundChannel);
+    }
+
+    // 2. Tocar o novo som
+    if (type == 0) { 
+        // PINTAR: Onda quadrada (50%), grave (400Hz), curto
+        soundChannel = soundPlayPSG(DutyCycle_50, 400, 60, 64);
+        soundTimer = 4; // Dura 4 frames (muito curto)
+    } 
+    else if (type == 1) { 
+        // MARCAR (X): Onda fina (12%), aguda (2000Hz), seco
+        soundChannel = soundPlayPSG(DutyCycle_12, 2000, 50, 64);
+        soundTimer = 3; // Dura 3 frames
+    }
+    else if (type == 2) {
+        // APAGAR: Ruído branco (Borracha)
+        soundChannel = soundPlayNoise(1500, 40, 64);
+        soundTimer = 5;
+    }
+    else if (type == 3) { 
+        // VITÓRIA: Som longo
+        soundChannel = soundPlayPSG(DutyCycle_50, 880, 80, 64);
+        soundTimer = 30; // Dura meio segundo
+    }
+}
+
+// Função chamada a cada frame para gerir o silêncio
+void updateSound() {
+    if (soundTimer > 0) {
+        soundTimer--;
+        if (soundTimer == 0) {
+            // O tempo acabou, cortar o som!
+            if (soundChannel != -1) {
+                soundKill(soundChannel);
+                soundChannel = -1;
+            }
+        }
     }
 }
 
 // ============================================================================
-// 🖌️ MOTOR GRÁFICO & FONTE MINI
+// 🧠 LÓGICA DO JOGO
 // ============================================================================
 
+void calculateTargetClues() {
+    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+    for(int r=0; r<GRID_ROWS; r++) {
+        int idx = 0, count = 0;
+        for(int c=0; c<GRID_COLS; c++) {
+            if(p->grid[r][c] == 1) count++;
+            else if(count > 0) { if(idx<MAX_CLUES) rowClues[r].values[idx++] = count; count = 0; }
+        }
+        if(count > 0 && idx<MAX_CLUES) rowClues[r].values[idx++] = count;
+        rowClues[r].count = idx;
+    }
+    for(int c=0; c<GRID_COLS; c++) {
+        int idx = 0, count = 0;
+        for(int r=0; r<GRID_ROWS; r++) {
+            if(p->grid[r][c] == 1) count++;
+            else if(count > 0) { if(idx<MAX_CLUES) colClues[c].values[idx++] = count; count = 0; }
+        }
+        if(count > 0 && idx<MAX_CLUES) colClues[c].values[idx++] = count;
+        colClues[c].count = idx;
+    }
+}
+
+bool checkLineMatch(int index, bool isRow) {
+    int currentClues[MAX_CLUES];
+    int idx = 0, count = 0;
+    for(int i=0; i<15; i++) {
+        int cell = isRow ? playerGrid[index][i] : playerGrid[i][index];
+        if(cell == 1) count++;
+        else if(count > 0) { if(idx<MAX_CLUES) currentClues[idx++] = count; count = 0; }
+    }
+    if(count > 0 && idx<MAX_CLUES) currentClues[idx++] = count;
+
+    LineClues* target = isRow ? &rowClues[index] : &colClues[index];
+    if (idx != target->count) return false;
+    for(int k=0; k<idx; k++) if (currentClues[k] != target->values[k]) return false;
+    return true;
+}
+
+void updateClueStates() {
+    for(int r=0; r<GRID_ROWS; r++) rowDone[r] = checkLineMatch(r, true);
+    for(int c=0; c<GRID_COLS; c++) colDone[c] = checkLineMatch(c, false);
+}
+
+void resetGame() {
+    for(int i=0; i<GRID_ROWS; i++) 
+        for(int j=0; j<GRID_COLS; j++) playerGrid[i][j] = 0;
+    gameWon = false;
+    calculateTargetClues();
+    updateClueStates();
+}
+
+void checkWin() {
+    if (gameWon) return;
+    updateClueStates();
+    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+    bool match = true;
+    for(int r=0; r<GRID_ROWS; r++) {
+        for(int c=0; c<GRID_COLS; c++) {
+            if ((p->grid[r][c] == 1 && playerGrid[r][c] != 1) ||
+                (p->grid[r][c] == 0 && playerGrid[r][c] == 1)) {
+                match = false; break;
+            }
+        }
+    }
+    if (match) {
+        gameWon = true;
+        playSound(3);
+    }
+}
+
+// ============================================================================
+// 🖌️ MOTOR GRÁFICO
+// ============================================================================
 void plot(int x, int y, u16 color) {
     if (x >= 0 && x < 256 && y >= 0 && y < 192) videoBuffer[y * 256 + x] = color;
 }
@@ -62,45 +171,26 @@ void drawRect(int x, int y, int w, int h, u16 color) {
     for(int i=0; i<h; i++) for(int j=0; j<w; j++) plot(x+j, y+i, color);
 }
 
-// Mini-fonte 3x5 para desenhar números pequenos nas pistas
-// Cada byte representa uma coluna de pixeis (LSB em cima)
 const u8 miniFont[10][3] = {
-    {0x1F, 0x11, 0x1F}, // 0
-    {0x00, 0x1F, 0x00}, // 1 (Simplificado)
-    {0x1D, 0x15, 0x17}, // 2
-    {0x15, 0x15, 0x1F}, // 3
-    {0x07, 0x04, 0x1F}, // 4
-    {0x17, 0x15, 0x1D}, // 5
-    {0x1F, 0x15, 0x1D}, // 6
-    {0x01, 0x01, 0x1F}, // 7
-    {0x1F, 0x15, 0x1F}, // 8
-    {0x17, 0x15, 0x1F}  // 9
+    {0x1F, 0x11, 0x1F}, {0x00, 0x1F, 0x00}, {0x1D, 0x15, 0x17}, {0x15, 0x15, 0x1F},
+    {0x07, 0x04, 0x1F}, {0x17, 0x15, 0x1D}, {0x1F, 0x15, 0x1D}, {0x01, 0x01, 0x1F},
+    {0x1F, 0x15, 0x1F}, {0x17, 0x15, 0x1F}
 };
 
 void drawMiniNum(int x, int y, int num, u16 color) {
-    if (num > 9) { // Desenha dois digitos se > 9
-        drawMiniNum(x - 4, y, num / 10, color);
-        num %= 10;
-    }
+    if (num > 9) { drawMiniNum(x - 4, y, num / 10, color); num %= 10; }
     for (int col = 0; col < 3; col++) {
         u8 colData = miniFont[num][col];
-        for (int row = 0; row < 5; row++) {
-            if ((colData >> row) & 1) plot(x + col, y + row, color);
-        }
+        for (int row = 0; row < 5; row++) if ((colData >> row) & 1) plot(x + col, y + row, color);
     }
 }
 
-// Desenha um X (Marcador)
 void drawX(int x, int y, int s, u16 c) {
     for(int i=0; i<s; i++) { plot(x+i, y+i, c); plot(x+s-1-i, y+i, c); }
 }
 
-// Agora o drawXMarker já sabe o que é o drawX
-void drawXMarker(int x, int y) {
-    drawX(x + 2, y + 2, CELL_SIZE - 5, COLOR_MARKER);
-}
+void drawXMarker(int x, int y) { drawX(x+2, y+2, CELL_SIZE-5, COLOR_MARKER); }
 
-// Desenha cursor (border highlight)
 void drawCursor(int r, int c) {
     int x = MARGIN_LEFT + (c * CELL_SIZE);
     int y = MARGIN_TOP + (r * CELL_SIZE);
@@ -110,110 +200,48 @@ void drawCursor(int r, int c) {
     drawRect(x+CELL_SIZE-1, y, 1, CELL_SIZE, COLOR_CURSOR);
 }
 
-// ============================================================================
-// 🧠 LÓGICA DO JOGO
-// ============================================================================
-
-// Gera as pistas baseado na grelha do puzzle atual
-void calculateClues() {
-    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
-    
-    // Linhas
-    for(int r=0; r<GRID_ROWS; r++) {
-        int idx = 0, count = 0;
-        for(int c=0; c<GRID_COLS; c++) {
-            if(p->grid[r][c] == 1) count++;
-            else if(count > 0) { if(idx<MAX_CLUES) rowClues[r].values[idx++] = count; count = 0; }
-        }
-        if(count > 0 && idx<MAX_CLUES) rowClues[r].values[idx++] = count;
-        rowClues[r].count = (idx == 0) ? 0 : idx; // Se vazio, 0 pistas
-    }
-
-    // Colunas
-    for(int c=0; c<GRID_COLS; c++) {
-        int idx = 0, count = 0;
-        for(int r=0; r<GRID_ROWS; r++) {
-            if(p->grid[r][c] == 1) count++;
-            else if(count > 0) { if(idx<MAX_CLUES) colClues[c].values[idx++] = count; count = 0; }
-        }
-        if(count > 0 && idx<MAX_CLUES) colClues[c].values[idx++] = count;
-        colClues[c].count = (idx == 0) ? 0 : idx;
-    }
-}
-
-void resetGame() {
-    for(int i=0; i<GRID_ROWS; i++) 
-        for(int j=0; j<GRID_COLS; j++) playerGrid[i][j] = 0;
-    gameWon = false;
-    calculateClues();
-}
-
-void checkWin() {
-    if (gameWon) return;
-    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
-    bool match = true;
-    for(int r=0; r<GRID_ROWS; r++) {
-        for(int c=0; c<GRID_COLS; c++) {
-            if (p->grid[r][c] == 1 && playerGrid[r][c] != 1) match = false;
-            if (p->grid[r][c] == 0 && playerGrid[r][c] == 1) match = false;
-        }
-    }
-    if (match) {
-        gameWon = true;
-        playSound(2); // Som Vitória
-    }
-}
-
 void renderGame(int cursorR, int cursorC) {
     u16 bg = gameWon ? COLOR_WIN_BG : COLOR_BG;
     for(int i=0; i<256*192; i++) videoBuffer[i] = bg;
 
-    // 1. Desenhar Pistas (Topo)
+    // Pistas
     for(int c=0; c<GRID_COLS; c++) {
+        u16 txtColor = colDone[c] ? COLOR_CLUE_DONE : COLOR_CLUE_TXT;
         int count = colClues[c].count;
         int x = MARGIN_LEFT + (c * CELL_SIZE) + 3;
         int yBase = MARGIN_TOP - 2;
-        for(int i=count-1; i>=0; i--) { // Desenha de baixo para cima
-            drawMiniNum(x, yBase - ((count-1-i)*7) - 6, colClues[c].values[i], COLOR_CLUE_TXT);
-        }
+        for(int i=count-1; i>=0; i--) drawMiniNum(x, yBase - ((count-1-i)*7) - 6, colClues[c].values[i], txtColor);
     }
-
-    // 2. Desenhar Pistas (Esquerda)
     for(int r=0; r<GRID_ROWS; r++) {
+        u16 txtColor = rowDone[r] ? COLOR_CLUE_DONE : COLOR_CLUE_TXT;
         int count = rowClues[r].count;
         int y = MARGIN_TOP + (r * CELL_SIZE) + 3;
         int xBase = MARGIN_LEFT - 2;
-        for(int i=count-1; i>=0; i--) { // Desenha da direita para a esquerda
+        for(int i=count-1; i>=0; i--) {
             int val = rowClues[r].values[i];
-            int offset = (val > 9) ? 8 : 4; // Espaço extra para 2 digitos
-            drawMiniNum(xBase - offset, y, val, COLOR_CLUE_TXT);
+            int offset = (val > 9) ? 8 : 4;
+            drawMiniNum(xBase - offset, y, val, txtColor);
             xBase -= (offset + 3);
         }
     }
 
-    // 3. Desenhar Grelha
+    // Grelha
     for(int r=0; r<GRID_ROWS; r++) {
         for(int c=0; c<GRID_COLS; c++) {
             int px = MARGIN_LEFT + (c * CELL_SIZE);
             int py = MARGIN_TOP + (r * CELL_SIZE);
-            
-            // Fundo da célula (com margem para simular linha de grelha)
             u16 color = COLOR_BG; 
             if (playerGrid[r][c] == 1) color = COLOR_FILLED;
             
             drawRect(px, py, CELL_SIZE-1, CELL_SIZE-1, color);
-            
-            // Linhas da grelha (simuladas pelo fundo)
             drawRect(px+CELL_SIZE-1, py, 1, CELL_SIZE, COLOR_GRID);
             drawRect(px, py+CELL_SIZE-1, CELL_SIZE, 1, COLOR_GRID);
 
             if (playerGrid[r][c] == 2) drawXMarker(px, py);
         }
     }
-    
-    // Bordas principais da grelha
-    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, 1, (GRID_ROWS*CELL_SIZE)+1, COLOR_CLUE_TXT); // Esquerda
-    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, (GRID_COLS*CELL_SIZE)+1, 1, COLOR_CLUE_TXT); // Topo
+    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, 1, (GRID_ROWS*CELL_SIZE)+1, COLOR_CLUE_TXT);
+    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, (GRID_COLS*CELL_SIZE)+1, 1, COLOR_CLUE_TXT);
 
     if (!gameWon && cursorR >= 0) drawCursor(cursorR, cursorC);
 }
@@ -223,11 +251,8 @@ void renderGame(int cursorR, int cursorC) {
 // ============================================================================
 int main(void) {
     irqEnable(IRQ_VBLANK);
-    
-    // Inicializar Som (Obrigatório para o playSound funcionar)
-    soundEnable(); 
+    soundEnable(); // Ligar motor de som
 
-    // Setup Ecrãs
     videoSetMode(MODE_0_2D);
     vramSetBankA(VRAM_A_MAIN_BG);
     consoleInit(0, 0, BgType_Text4bpp, BgSize_T_256x256, 31, 0, true, true);
@@ -242,14 +267,15 @@ int main(void) {
     bool forceRender = true;
 
     iprintf("\x1b[2;8H-- PIKRANJI DS --");
-    iprintf("\x1b[4;2HControlos:");
-    iprintf("\x1b[6;2H[Seta Baixo] Pintar");
-    iprintf("\x1b[7;2H[Botao B]    Marcar (X)");
-    iprintf("\x1b[8;2H[Stylus]     Mover");
-    iprintf("\x1b[10;2H[Select]     Prox. Nivel");
+    iprintf("\x1b[4;2HControlos (Stylus +):");
+    iprintf("\x1b[6;2H[Seta BAIXO] Pintar");
+    iprintf("\x1b[7;2H[Seta CIMA]  Marcar (X)");
+    iprintf("\x1b[9;2H[Select]     Prox. Puzzle");
+    iprintf("\x1b[10;2H[Start]      Reiniciar");
 
     while(1) {
         swiIntrWait(1, IRQ_VBLANK);
+        updateSound(); // <--- IMPORTANTE: Atualiza o timer do som a cada frame!
         scanKeys();
         int held = keysHeld();
         int down = keysDown();
@@ -261,7 +287,6 @@ int main(void) {
             forceRender = true;
         }
 
-        // Input do Jogo
         int currR = -1, currC = -1;
         if (held & KEY_TOUCH) {
             touchPosition touch;
@@ -273,41 +298,49 @@ int main(void) {
                 currR = r; currC = c;
                 
                 if (!gameWon) {
-                    if (held & KEY_DOWN) { // Pintar
-                        if (playerGrid[r][c] != 1) {
-                            playerGrid[r][c] = 1;
-                            playSound(0); // Som de tinta
+                    if (down & KEY_TOUCH) {
+                        isDragging = true;
+                        if (held & KEY_UP) { 
+                            dragType = (playerGrid[r][c] == 2) ? 2 : 3; // Modo X
+                        } else if (held & KEY_DOWN) { 
+                            dragType = (playerGrid[r][c] == 1) ? 2 : 1; // Modo Pintar
+                        } else {
+                            dragType = 0; // Só mover
+                        }
+                    }
+
+                    if (isDragging && dragType != 0) {
+                        int newState = -1;
+                        if (dragType == 1) newState = 1; // Pintar
+                        else if (dragType == 2) newState = 0; // Apagar
+                        else if (dragType == 3) newState = 2; // Marcar X
+
+                        if (playerGrid[r][c] != newState) {
+                            playerGrid[r][c] = newState;
+                            
+                            // Tocar som específico para cada ação
+                            if (newState == 1) playSound(0); // Pintar
+                            else if (newState == 2) playSound(1); // X
+                            else if (newState == 0) playSound(2); // Apagar
+
                             checkWin();
                             forceRender = true;
                         }
-                    } else if (held & KEY_B) { // Marcar
-                        if (playerGrid[r][c] != 2) {
-                            playerGrid[r][c] = 2;
-                            playSound(1); // Som de marcação
-                            forceRender = true;
-                        }
-                    } else if (down & KEY_TOUCH) {
-                        // Som subtil só para feedback de toque se não estiver a pintar
-                        // playSound(3); // Opcional
                     }
                 }
             }
+        } else {
+            isDragging = false;
+            dragType = 0;
         }
 
         if (forceRender || currR != lastR || currC != lastC) {
             const Puzzle* p = &allPuzzles[currentPuzzleIndex];
             iprintf("\x1b[14;2HPuzzle: %d / %d   ", currentPuzzleIndex + 1, PUZZLE_COUNT);
+            iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m   ", p->meaning); 
             
-            // Só mostra o significado se ganhar (como spoiler protection!)
-            if (gameWon) {
-                iprintf("\x1b[16;2HSignificado:");
-                iprintf("\x1b[17;2H\x1b[32m%s\x1b[39m", p->meaning); // Texto verde
-                iprintf("\x1b[19;2H** COMPLETO! ** ");
-            } else {
-                iprintf("\x1b[16;2H               ");
-                iprintf("\x1b[17;2H????????       ");
-                iprintf("\x1b[19;2H                ");
-            }
+            if (gameWon) iprintf("\x1b[18;2H** COMPLETO! ** ");
+            else iprintf("\x1b[18;2H                  ");
 
             renderGame(currR, currC);
             lastR = currR; lastC = currC;
