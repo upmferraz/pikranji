@@ -38,6 +38,3 @@ Não precisas de instalar o toolchain devkitPro no teu sistema. O script `build.
 ## 🎮 Como Jogar
 
 Abre o ficheiro `.nds` gerado no teu emulador favorito:
-
-```bash
-desmume pikranji.nds
