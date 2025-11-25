@@ -1,5 +1,7 @@
 #include <nds.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 #include "puzzles.h"
 
 // ============================================================================
@@ -13,6 +15,19 @@
 #define COLOR_MARKER    (RGB15(15, 15, 15) | BIT(15))
 #define COLOR_CURSOR    (RGB15(0,  25, 31) | BIT(15))
 #define COLOR_WIN_BG    (RGB15(22, 31, 22) | BIT(15))
+#define MAX_PARTICLES 150
+typedef struct {
+    float x, y;
+    float vx, vy;
+    int life;
+    u16 color;
+    bool active;
+} Particle;
+
+Particle particles[MAX_PARTICLES];
+bool fireworksActive = false;
+void triggerExplosion(); 
+void updateAndDrawFireworks(); 
 
 #define CELL_SIZE 10
 #define GRID_COLS 15
@@ -37,6 +52,9 @@ LineClues colClues[GRID_COLS];
 bool isDragging = false;
 int dragType = 0; 
 
+// Aleatoriedade
+int puzzleBag[1000]; // Array suficientemente grande para os teus puzzles
+int bagIndex = 0;    // Onde estamos no saco atual
 // ============================================================================
 // 🔊 GESTOR DE SOM (NOVO)
 // ============================================================================
@@ -157,6 +175,7 @@ void checkWin() {
     if (match) {
         gameWon = true;
         playSound(3);
+	triggerExplosion();
     }
 }
 
@@ -246,6 +265,88 @@ void renderGame(int cursorR, int cursorC) {
     if (!gameWon && cursorR >= 0) drawCursor(cursorR, cursorC);
 }
 
+// Algoritmo Fisher-Yates para baralhar o array
+void shuffleBag() {
+    // 1. Preencher o saco com IDs sequenciais (0, 1, 2...)
+    for (int i = 0; i < PUZZLE_COUNT; i++) {
+        puzzleBag[i] = i;
+    }
+    
+    // 2. Baralhar
+    for (int i = PUZZLE_COUNT - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int temp = puzzleBag[i];
+        puzzleBag[i] = puzzleBag[j];
+        puzzleBag[j] = temp;
+    }
+    
+    // 3. Reiniciar índice
+    bagIndex = 0;
+}
+
+// Função para obter o próximo puzzle aleatório
+int getNextPuzzleID() {
+    if (bagIndex >= PUZZLE_COUNT) {
+        shuffleBag(); // Se acabaram os puzzles, baralha de novo
+    }
+    return puzzleBag[bagIndex++];
+}
+
+// Inicia uma explosão no centro do ecrã
+void triggerExplosion() {
+    fireworksActive = true;
+    for(int i=0; i<MAX_PARTICLES; i++) {
+        particles[i].active = true;
+        particles[i].x = 128; // Centro horizontal
+        particles[i].y = 80;  // Centro vertical (aprox)
+        particles[i].life = 60 + (rand() % 60); // Vida entre 1 e 2 segundos
+        
+        // Cores aleatórias vibrantes
+        int r = rand() % 31;
+        int g = rand() % 31;
+        int b = rand() % 31;
+        particles[i].color = RGB15(r, g, b) | BIT(15);
+
+        // Velocidade explosiva aleatória
+        // (rand() % 100) / 20.0 - 2.5 dá um range entre -2.5 e 2.5
+        particles[i].vx = ((rand() % 100) / 20.0) - 2.5; 
+        particles[i].vy = ((rand() % 100) / 20.0) - 3.5; // Mais força para cima
+    }
+}
+
+// Atualiza física e desenha
+void updateAndDrawFireworks() {
+    int activeCount = 0;
+    for(int i=0; i<MAX_PARTICLES; i++) {
+        if(!particles[i].active) continue;
+
+        activeCount++;
+
+        // 1. Física
+        particles[i].x += particles[i].vx;
+        particles[i].y += particles[i].vy;
+        particles[i].vy += 0.08; // Gravidade
+        particles[i].life--;
+
+        // 2. Apagar se sair do ecrã ou morrer
+        if(particles[i].life <= 0 || particles[i].y > 192 || particles[i].x < 0 || particles[i].x > 256) {
+            particles[i].active = false;
+            continue;
+        }
+
+        // 3. Desenhar (Plot)
+        // Desenhamos um pequeno quadrado 2x2 para ser mais visível
+        int px = (int)particles[i].x;
+        int py = (int)particles[i].y;
+        plot(px, py, particles[i].color);
+        plot(px+1, py, particles[i].color);
+        plot(px, py+1, particles[i].color);
+        plot(px+1, py+1, particles[i].color);
+    }
+
+    if(activeCount == 0) fireworksActive = false;
+}
+
 // ============================================================================
 // MAIN LOOP
 // ============================================================================
@@ -262,6 +363,13 @@ int main(void) {
     int bg3 = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     videoBuffer = bgGetGfxPtr(bg3);
 
+    // Inicializar a aleatoriedade com base no relógio do sistema (para não ser sempre igual)
+    srand(time(NULL)); 
+    shuffleBag();
+    
+    // Definir o primeiro puzzle
+    currentPuzzleIndex = getNextPuzzleID();
+    
     resetGame();
     int lastR = -1, lastC = -1;
     bool forceRender = true;
@@ -275,18 +383,17 @@ int main(void) {
 
     while(1) {
         swiIntrWait(1, IRQ_VBLANK);
-        updateSound(); // <--- IMPORTANTE: Atualiza o timer do som a cada frame!
+        updateSound(); // <--- Atualiza o timer do som a cada frame!
         scanKeys();
         int held = keysHeld();
         int down = keysDown();
 
         if (down & KEY_START) { resetGame(); forceRender = true; }
-        if (down & KEY_SELECT) {
-            currentPuzzleIndex = (currentPuzzleIndex + 1) % PUZZLE_COUNT;
+	if (down & KEY_SELECT) {
+            currentPuzzleIndex = getNextPuzzleID(); // Pega no próximo do saco baralhado
             resetGame();
             forceRender = true;
         }
-
         int currR = -1, currC = -1;
         if (held & KEY_TOUCH) {
             touchPosition touch;
@@ -334,15 +441,21 @@ int main(void) {
             dragType = 0;
         }
 
-        if (forceRender || currR != lastR || currC != lastC) {
+	if (forceRender || currR != lastR || currC != lastC || fireworksActive) {
             const Puzzle* p = &allPuzzles[currentPuzzleIndex];
             iprintf("\x1b[14;2HPuzzle: %d / %d   ", currentPuzzleIndex + 1, PUZZLE_COUNT);
-            iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m   ", p->meaning); 
+	    iprintf("\x1b[16;2HSignificado:                                ");
+	    iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m", p->meaning);
             
             if (gameWon) iprintf("\x1b[18;2H** COMPLETO! ** ");
             else iprintf("\x1b[18;2H                  ");
 
             renderGame(currR, currC);
+	    // Desenha os fogos POR CIMA do jogo
+            if(fireworksActive) {
+                updateAndDrawFireworks();
+            }
+
             lastR = currR; lastC = currC;
             forceRender = false;
         }
