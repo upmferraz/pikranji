@@ -6,16 +6,60 @@
 #include <fat.h>
 
 // ============================================================================
-// 🎨 CORES & CONFIG
+// 🎨 CORES & TEMAS
 // ============================================================================
-#define COLOR_BG        (RGB15(28, 29, 31) | BIT(15))
-#define COLOR_GRID      (RGB15(22, 23, 25) | BIT(15))
-#define COLOR_CLUE_TXT  (RGB15(5,  8,  12) | BIT(15))
-#define COLOR_CLUE_DONE (RGB15(20, 20, 20) | BIT(15))
-#define COLOR_FILLED    (RGB15(31, 10, 5)  | BIT(15))
+// Estrutura para um Tema de Cores
+typedef struct {
+    u16 bg;         // Fundo do ecrã de baixo
+    u16 grid;       // Linhas da grelha (vazias)
+    u16 filled;     // Cor da célula pintada (tinta)
+    u16 cursor;     // Cor do cursor
+    u16 clue_txt;   // Texto das pistas
+    u16 clue_done;  // Texto das pistas completas (mais escuro/desmaiado)
+} ColorTheme;
+
+// Definição de 5 Temas "Vegan Friendly" (Natureza/Suave)
+ColorTheme themes[] = {
+    // 0: Clássico (Escuro/Neutro)
+    { 
+        (RGB15(28, 29, 31) | BIT(15)), (RGB15(22, 23, 25) | BIT(15)), 
+        (RGB15(31, 10, 5) | BIT(15)), (RGB15(0, 25, 31) | BIT(15)),
+        (RGB15(5, 8, 12) | BIT(15)), (RGB15(20, 20, 20) | BIT(15))
+    },
+    // 1: Floresta (Verdes)
+    { 
+        (RGB15(26, 30, 26) | BIT(15)), (RGB15(20, 24, 20) | BIT(15)), 
+        (RGB15(10, 25, 10) | BIT(15)), (RGB15(31, 20, 10) | BIT(15)),
+        (RGB15(5, 15, 5) | BIT(15)), (RGB15(18, 22, 18) | BIT(15))
+    },
+    // 2: Oceano (Azuis/Cyans)
+    { 
+        (RGB15(25, 28, 30) | BIT(15)), (RGB15(20, 23, 25) | BIT(15)), 
+        (RGB15(5, 20, 31) | BIT(15)), (RGB15(31, 25, 10) | BIT(15)),
+        (RGB15(0, 10, 20) | BIT(15)), (RGB15(18, 20, 22) | BIT(15))
+    },
+    // 3: Terra/Outono (Castanhos/Laranjas)
+    { 
+        (RGB15(30, 28, 26) | BIT(15)), (RGB15(25, 23, 21) | BIT(15)), 
+        (RGB15(25, 12, 5) | BIT(15)), (RGB15(5, 20, 15) | BIT(15)),
+        (RGB15(15, 8, 5) | BIT(15)), (RGB15(24, 22, 20) | BIT(15))
+    },
+    // 4: Lavanda (Roxos Suaves)
+    { 
+        (RGB15(29, 27, 30) | BIT(15)), (RGB15(24, 22, 25) | BIT(15)), 
+        (RGB15(20, 10, 25) | BIT(15)), (RGB15(10, 31, 20) | BIT(15)),
+        (RGB15(12, 5, 15) | BIT(15)), (RGB15(22, 20, 22) | BIT(15))
+    }
+};
+
+#define NUM_THEMES 5
+int currentThemeIdx = 0; // Índice do tema atual
+
+// Cores Fixas (Interface e Marcadores)
 #define COLOR_MARKER    (RGB15(15, 15, 15) | BIT(15))
-#define COLOR_CURSOR    (RGB15(0,  25, 31) | BIT(15))
-#define COLOR_WIN_BG    (RGB15(22, 31, 22) | BIT(15))
+#define COLOR_WIN_BG    (RGB15(22, 31, 22) | BIT(15)) // Fundo de vitória (sempre verde)
+#define COLOR_BTN       (RGB15(10, 10, 10) | BIT(15))
+#define COLOR_BTN_TXT   (RGB15(25, 25, 25) | BIT(15))
 
 // --- SISTEMA DE PARTÍCULAS ---
 #define MAX_PARTICLES 150
@@ -35,27 +79,30 @@ void triggerExplosion();
 void updateAndDrawFireworks(); 
 void saveGame(); 
 void loadGame();
+void useHint();
+void solvePuzzle();
 
 #define CELL_SIZE 10
 #define GRID_COLS 15
 #define GRID_ROWS 15
 #define MARGIN_LEFT 60 
-#define MARGIN_TOP  40
+#define MARGIN_TOP  50
 #define MAX_CLUES 8
 
 // --- SAVE DATA ---
 typedef struct {
-    unsigned int score;
+    int score;
     bool solved[1000]; 
 } SaveData;
 
 SaveData saveData;
-bool fatReady = false; // <--- NOVA FLAG DE SEGURANÇA
+bool fatReady = false;
 
 u16* videoBuffer;
 int currentPuzzleIndex = 0;
 int playerGrid[GRID_ROWS][GRID_COLS];
 bool gameWon = false;
+bool cheated = false;
 
 bool rowDone[GRID_ROWS];
 bool colDone[GRID_COLS];
@@ -72,6 +119,14 @@ int dragType = 0;
 int puzzleBag[1000]; 
 int bagIndex = 0;   
 
+// --- BOTÕES ---
+#define BTN_W 40
+#define BTN_H 20
+#define BTN_HINT_X 10
+#define BTN_HINT_Y 15
+#define BTN_SOLVE_X 215
+#define BTN_SOLVE_Y 15
+
 // ============================================================================
 // 🔊 GESTOR DE SOM
 // ============================================================================
@@ -84,7 +139,7 @@ void playSound(int type) {
     if (type == 0) { // PINTAR
         soundChannel = soundPlayPSG(DutyCycle_50, 400, 60, 64);
         soundTimer = 4;
-    } else if (type == 1) { // MARCAR
+    } else if (type == 1) { // MARCAR / AJUDA
         soundChannel = soundPlayPSG(DutyCycle_12, 2000, 50, 64);
         soundTimer = 3;
     } else if (type == 2) { // APAGAR
@@ -93,6 +148,9 @@ void playSound(int type) {
     } else if (type == 3) { // VITÓRIA
         soundChannel = soundPlayPSG(DutyCycle_50, 880, 80, 64);
         soundTimer = 30;
+    } else if (type == 4) { // ERRO
+        soundChannel = soundPlayPSG(DutyCycle_25, 150, 60, 64);
+        soundTimer = 10;
     }
 }
 
@@ -156,6 +214,11 @@ void updateClueStates() {
 void resetGame() {
     for(int i=0; i<GRID_ROWS; i++) for(int j=0; j<GRID_COLS; j++) playerGrid[i][j] = 0;
     gameWon = false;
+    cheated = false;
+    
+    // Escolher um tema aleatório para este novo jogo
+    currentThemeIdx = rand() % NUM_THEMES;
+    
     calculateTargetClues();
     updateClueStates();
 }
@@ -183,12 +246,59 @@ void checkWin() {
     playSound(3);
     triggerExplosion();
 
-    if (!saveData.solved[currentPuzzleIndex]) {
+    if (!saveData.solved[currentPuzzleIndex] && !cheated) {
         saveData.solved[currentPuzzleIndex] = true;
         int pointsEarned = 50 + (pixelCount * 2);
         saveData.score += pointsEarned;
         saveGame();
     }
+}
+
+// --- SISTEMA DE AJUDA ---
+void useHint() {
+    if (gameWon) return;
+
+    if (saveData.score > 0) {
+        saveData.score--;
+        saveGame();
+    }
+
+    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+    int attempts = 0;
+    while(attempts < 100) {
+        int r = rand() % GRID_ROWS;
+        int c = rand() % GRID_COLS;
+        
+        if (rand() % 2 == 0) {
+            if (!rowDone[r]) {
+                for(int i=0; i<GRID_COLS; i++) playerGrid[r][i] = (p->grid[r][i] == 1) ? 1 : 2;
+                playSound(1); checkWin(); return;
+            }
+        } else {
+            if (!colDone[c]) {
+                for(int i=0; i<GRID_ROWS; i++) playerGrid[i][c] = (p->grid[i][c] == 1) ? 1 : 2;
+                playSound(1); checkWin(); return;
+            }
+        }
+        attempts++;
+    }
+    for(int r=0; r<GRID_ROWS; r++) {
+        if (!rowDone[r]) {
+            for(int i=0; i<GRID_COLS; i++) playerGrid[r][i] = (p->grid[r][i] == 1) ? 1 : 2;
+            playSound(1); checkWin(); return;
+        }
+    }
+}
+
+void solvePuzzle() {
+    if (gameWon) return;
+    cheated = true; 
+    const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+    for(int r=0; r<GRID_ROWS; r++) {
+        for(int c=0; c<GRID_COLS; c++) playerGrid[r][c] = (p->grid[r][c] == 1) ? 1 : 2;
+    }
+    playSound(1);
+    checkWin();
 }
 
 // ============================================================================
@@ -216,34 +326,55 @@ void drawMiniNum(int x, int y, int num, u16 color) {
     }
 }
 
+void drawButtons() {
+    // Botão Ajuda
+    drawRect(BTN_HINT_X, BTN_HINT_Y, BTN_W, BTN_H, COLOR_BTN);
+    drawRect(BTN_HINT_X+18, BTN_HINT_Y+6, 4, 2, COLOR_BTN_TXT);
+    drawRect(BTN_HINT_X+22, BTN_HINT_Y+6, 2, 4, COLOR_BTN_TXT);
+    drawRect(BTN_HINT_X+20, BTN_HINT_Y+10, 2, 2, COLOR_BTN_TXT);
+    drawRect(BTN_HINT_X+20, BTN_HINT_Y+14, 2, 2, COLOR_BTN_TXT);
+
+    // Botão Solução
+    drawRect(BTN_SOLVE_X, BTN_SOLVE_Y, BTN_W, BTN_H, COLOR_BTN);
+    drawRect(BTN_SOLVE_X+19, BTN_SOLVE_Y+6, 2, 7, COLOR_BTN_TXT);
+    drawRect(BTN_SOLVE_X+19, BTN_SOLVE_Y+14, 2, 2, COLOR_BTN_TXT);
+}
+
 void drawX(int x, int y, int s, u16 c) {
     for(int i=0; i<s; i++) { plot(x+i, y+i, c); plot(x+s-1-i, y+i, c); }
 }
 
 void drawXMarker(int x, int y) { drawX(x+2, y+2, CELL_SIZE-5, COLOR_MARKER); }
 
-void drawCursor(int r, int c) {
+void drawCursor(int r, int c, u16 color) {
     int x = MARGIN_LEFT + (c * CELL_SIZE);
     int y = MARGIN_TOP + (r * CELL_SIZE);
-    drawRect(x, y, CELL_SIZE, 1, COLOR_CURSOR);
-    drawRect(x, y+CELL_SIZE-1, CELL_SIZE, 1, COLOR_CURSOR);
-    drawRect(x, y, 1, CELL_SIZE, COLOR_CURSOR);
-    drawRect(x+CELL_SIZE-1, y, 1, CELL_SIZE, COLOR_CURSOR);
+    drawRect(x, y, CELL_SIZE, 1, color);
+    drawRect(x, y+CELL_SIZE-1, CELL_SIZE, 1, color);
+    drawRect(x, y, 1, CELL_SIZE, color);
+    drawRect(x+CELL_SIZE-1, y, 1, CELL_SIZE, color);
 }
 
 void renderGame(int cursorR, int cursorC) {
-    u16 bg = gameWon ? COLOR_WIN_BG : COLOR_BG;
+    // Selecionar cores baseadas no tema atual
+    ColorTheme* t = &themes[currentThemeIdx];
+    
+    // Se ganhou, fundo especial verde, senão fundo do tema
+    u16 bg = gameWon ? COLOR_WIN_BG : t->bg;
+    
     for(int i=0; i<256*192; i++) videoBuffer[i] = bg;
 
+    // Desenhar Pistas (Colunas)
     for(int c=0; c<GRID_COLS; c++) {
-        u16 txtColor = colDone[c] ? COLOR_CLUE_DONE : COLOR_CLUE_TXT;
+        u16 txtColor = colDone[c] ? t->clue_done : t->clue_txt;
         int count = colClues[c].count;
         int x = MARGIN_LEFT + (c * CELL_SIZE) + 3;
         int yBase = MARGIN_TOP - 2;
         for(int i=count-1; i>=0; i--) drawMiniNum(x, yBase - ((count-1-i)*7) - 6, colClues[c].values[i], txtColor);
     }
+    // Desenhar Pistas (Linhas)
     for(int r=0; r<GRID_ROWS; r++) {
-        u16 txtColor = rowDone[r] ? COLOR_CLUE_DONE : COLOR_CLUE_TXT;
+        u16 txtColor = rowDone[r] ? t->clue_done : t->clue_txt;
         int count = rowClues[r].count;
         int y = MARGIN_TOP + (r * CELL_SIZE) + 3;
         int xBase = MARGIN_LEFT - 2;
@@ -255,24 +386,31 @@ void renderGame(int cursorR, int cursorC) {
         }
     }
 
+    // Desenhar Grelha
     for(int r=0; r<GRID_ROWS; r++) {
         for(int c=0; c<GRID_COLS; c++) {
             int px = MARGIN_LEFT + (c * CELL_SIZE);
             int py = MARGIN_TOP + (r * CELL_SIZE);
-            u16 color = COLOR_BG; 
-            if (playerGrid[r][c] == 1) color = COLOR_FILLED;
+            u16 color = t->bg; // Cor de fundo do tema para células vazias
+            
+            if (playerGrid[r][c] == 1) color = t->filled; // Cor de tinta do tema
             
             drawRect(px, py, CELL_SIZE-1, CELL_SIZE-1, color);
-            drawRect(px+CELL_SIZE-1, py, 1, CELL_SIZE, COLOR_GRID);
-            drawRect(px, py+CELL_SIZE-1, CELL_SIZE, 1, COLOR_GRID);
+            drawRect(px+CELL_SIZE-1, py, 1, CELL_SIZE, t->grid); // Cor da linha da grelha do tema
+            drawRect(px, py+CELL_SIZE-1, CELL_SIZE, 1, t->grid); // Cor da linha da grelha do tema
 
             if (playerGrid[r][c] == 2) drawXMarker(px, py);
         }
     }
-    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, 1, (GRID_ROWS*CELL_SIZE)+1, COLOR_CLUE_TXT);
-    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, (GRID_COLS*CELL_SIZE)+1, 1, COLOR_CLUE_TXT);
+    
+    // Linhas limitadoras da grelha
+    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, 1, (GRID_ROWS*CELL_SIZE)+1, t->clue_txt);
+    drawRect(MARGIN_LEFT-1, MARGIN_TOP-1, (GRID_COLS*CELL_SIZE)+1, 1, t->clue_txt);
 
-    if (!gameWon && cursorR >= 0) drawCursor(cursorR, cursorC);
+    // Cursor (com cor do tema)
+    if (!gameWon && cursorR >= 0) drawCursor(cursorR, cursorC, t->cursor);
+
+    if (!gameWon) drawButtons();
 }
 
 void shuffleBag() {
@@ -327,7 +465,7 @@ void updateAndDrawFireworks() {
 
 // --- SAVE / LOAD SEGUROS ---
 void saveGame() {
-    if (!fatReady) return; // Se não houver cartão, ignora
+    if (!fatReady) return; 
     FILE* file = fopen("pikranji.sav", "wb");
     if (file) {
         fwrite(&saveData, sizeof(SaveData), 1, file);
@@ -339,7 +477,7 @@ void loadGame() {
     saveData.score = 0;
     for(int i=0; i<1000; i++) saveData.solved[i] = false;
 
-    if (!fatReady) return; // Se não houver cartão, ignora
+    if (!fatReady) return; 
 
     FILE* file = fopen("pikranji.sav", "rb");
     if (file) {
@@ -364,15 +502,13 @@ int main(void) {
     int bg3 = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     videoBuffer = bgGetGfxPtr(bg3);
 
-    // 4. Inicializar FAT com segurança
     fatReady = fatInitDefault(); 
     
-    // 5. Carregar e inicializar
     loadGame(); 
     srand(time(NULL)); 
     shuffleBag();
     currentPuzzleIndex = getNextPuzzleID();
-    resetGame();
+    resetGame(); // Aqui será escolhido o primeiro tema
     
     int lastR = -1, lastC = -1;
     bool forceRender = true;
@@ -382,6 +518,9 @@ int main(void) {
     iprintf("\x1b[7;2H[Seta CIMA]  Marcar (X)");
     iprintf("\x1b[9;2H[Select]     Prox. Puzzle");
     iprintf("\x1b[10;2H[Start]      Reiniciar");
+    
+    iprintf("\x1b[21;1H[?] Ajuda (Custo 1)");
+    iprintf("\x1b[21;20H[!] Resolver");
 
     while(1) {
         swiIntrWait(1, IRQ_VBLANK);
@@ -395,38 +534,61 @@ int main(void) {
         if (down & KEY_SELECT) { currentPuzzleIndex = getNextPuzzleID(); resetGame(); forceRender = true; }
 
         int currR = -1, currC = -1;
-        if (held & KEY_TOUCH) {
+        if (down & KEY_TOUCH) {
             touchPosition touch;
             touchRead(&touch);
+
+            // 1. Verificar Clique nos Botões (Topo)
+            if (!gameWon) {
+                if (touch.px >= BTN_HINT_X && touch.px <= BTN_HINT_X + BTN_W &&
+                    touch.py >= BTN_HINT_Y && touch.py <= BTN_HINT_Y + BTN_H) {
+                    useHint();
+                    forceRender = true;
+                }
+                else if (touch.px >= BTN_SOLVE_X && touch.px <= BTN_SOLVE_X + BTN_W &&
+                         touch.py >= BTN_SOLVE_Y && touch.py <= BTN_SOLVE_Y + BTN_H) {
+                    solvePuzzle();
+                    forceRender = true;
+                }
+            }
+
+            // 2. Verificar Grelha
             int c = (touch.px - MARGIN_LEFT) / CELL_SIZE;
             int r = (touch.py - MARGIN_TOP) / CELL_SIZE;
 
             if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
                 currR = r; currC = c;
                 if (!gameWon) {
-                    if (down & KEY_TOUCH) {
-                        isDragging = true;
-                        if (held & KEY_UP) dragType = (playerGrid[r][c] == 2) ? 2 : 3; 
-                        else if (held & KEY_DOWN) dragType = (playerGrid[r][c] == 1) ? 2 : 1; 
-                        else dragType = 0; 
-                    }
-                    if (isDragging && dragType != 0) {
-                        int newState = -1;
-                        if (dragType == 1) newState = 1; 
-                        else if (dragType == 2) newState = 0; 
-                        else if (dragType == 3) newState = 2; 
-
-                        if (playerGrid[r][c] != newState) {
-                            playerGrid[r][c] = newState;
-                            if (newState == 1) playSound(0);
-                            else if (newState == 2) playSound(1);
-                            else if (newState == 0) playSound(2);
-                            checkWin(); 
-                            forceRender = true;
-                        }
-                    }
+                    isDragging = true;
+                    if (held & KEY_UP) dragType = (playerGrid[r][c] == 2) ? 2 : 3; 
+                    else if (held & KEY_DOWN) dragType = (playerGrid[r][c] == 1) ? 2 : 1; 
+                    else dragType = 0; 
                 }
             }
+        } else if (held & KEY_TOUCH && isDragging) {
+             touchPosition touch;
+             touchRead(&touch);
+             int c = (touch.px - MARGIN_LEFT) / CELL_SIZE;
+             int r = (touch.py - MARGIN_TOP) / CELL_SIZE;
+             
+             if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
+                currR = r; currC = c;
+                if (dragType != 0) {
+                    int newState = -1;
+                    if (dragType == 1) newState = 1; 
+                    else if (dragType == 2) newState = 0; 
+                    else if (dragType == 3) newState = 2; 
+
+                    if (playerGrid[r][c] != newState) {
+                        playerGrid[r][c] = newState;
+                        if (newState == 1) playSound(0);
+                        else if (newState == 2) playSound(1);
+                        else if (newState == 0) playSound(2);
+                        checkWin(); 
+                        forceRender = true;
+                    }
+                }
+             }
         } else {
             isDragging = false;
             dragType = 0;
@@ -442,6 +604,8 @@ int main(void) {
             
             if (fatReady && saveData.solved[currentPuzzleIndex]) {
                  iprintf("\x1b[14;20H\x1b[33m[RESOLVIDO]\x1b[39m");
+            } else if (cheated) {
+                 iprintf("\x1b[14;20H\x1b[31m[BATOTA]   \x1b[39m");
             } else {
                  iprintf("\x1b[14;20H           ");
             }
