@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include "puzzles.h"
+#include <fat.h>
 
 // ============================================================================
 // 🎨 CORES & CONFIG
@@ -15,6 +16,8 @@
 #define COLOR_MARKER    (RGB15(15, 15, 15) | BIT(15))
 #define COLOR_CURSOR    (RGB15(0,  25, 31) | BIT(15))
 #define COLOR_WIN_BG    (RGB15(22, 31, 22) | BIT(15))
+
+// --- SISTEMA DE PARTÍCULAS ---
 #define MAX_PARTICLES 150
 typedef struct {
     float x, y;
@@ -26,8 +29,12 @@ typedef struct {
 
 Particle particles[MAX_PARTICLES];
 bool fireworksActive = false;
+
+// --- PROTÓTIPOS ---
 void triggerExplosion(); 
 void updateAndDrawFireworks(); 
+void saveGame(); 
+void loadGame();
 
 #define CELL_SIZE 10
 #define GRID_COLS 15
@@ -35,6 +42,15 @@ void updateAndDrawFireworks();
 #define MARGIN_LEFT 60 
 #define MARGIN_TOP  40
 #define MAX_CLUES 8
+
+// --- SAVE DATA ---
+typedef struct {
+    unsigned int score;
+    bool solved[1000]; 
+} SaveData;
+
+SaveData saveData;
+bool fatReady = false; // <--- NOVA FLAG DE SEGURANÇA
 
 u16* videoBuffer;
 int currentPuzzleIndex = 0;
@@ -53,53 +69,39 @@ bool isDragging = false;
 int dragType = 0; 
 
 // Aleatoriedade
-int puzzleBag[1000]; // Array suficientemente grande para os teus puzzles
-int bagIndex = 0;    // Onde estamos no saco atual
+int puzzleBag[1000]; 
+int bagIndex = 0;   
+
 // ============================================================================
-// 🔊 GESTOR DE SOM (NOVO)
+// 🔊 GESTOR DE SOM
 // ============================================================================
-int soundChannel = -1; // Canal que está a tocar atualmente
-int soundTimer = 0;    // Contador para desligar o som
+int soundChannel = -1;
+int soundTimer = 0;   
 
 void playSound(int type) {
-    // 1. Se já houver um som a tocar, mata-o para não sobrepor
-    if (soundChannel != -1) {
-        soundKill(soundChannel);
-    }
+    if (soundChannel != -1) soundKill(soundChannel);
 
-    // 2. Tocar o novo som
-    if (type == 0) { 
-        // PINTAR: Onda quadrada (50%), grave (400Hz), curto
+    if (type == 0) { // PINTAR
         soundChannel = soundPlayPSG(DutyCycle_50, 400, 60, 64);
-        soundTimer = 4; // Dura 4 frames (muito curto)
-    } 
-    else if (type == 1) { 
-        // MARCAR (X): Onda fina (12%), aguda (2000Hz), seco
+        soundTimer = 4;
+    } else if (type == 1) { // MARCAR
         soundChannel = soundPlayPSG(DutyCycle_12, 2000, 50, 64);
-        soundTimer = 3; // Dura 3 frames
-    }
-    else if (type == 2) {
-        // APAGAR: Ruído branco (Borracha)
+        soundTimer = 3;
+    } else if (type == 2) { // APAGAR
         soundChannel = soundPlayNoise(1500, 40, 64);
         soundTimer = 5;
-    }
-    else if (type == 3) { 
-        // VITÓRIA: Som longo
+    } else if (type == 3) { // VITÓRIA
         soundChannel = soundPlayPSG(DutyCycle_50, 880, 80, 64);
-        soundTimer = 30; // Dura meio segundo
+        soundTimer = 30;
     }
 }
 
-// Função chamada a cada frame para gerir o silêncio
 void updateSound() {
     if (soundTimer > 0) {
         soundTimer--;
-        if (soundTimer == 0) {
-            // O tempo acabou, cortar o som!
-            if (soundChannel != -1) {
-                soundKill(soundChannel);
-                soundChannel = -1;
-            }
+        if (soundTimer == 0 && soundChannel != -1) {
+            soundKill(soundChannel);
+            soundChannel = -1;
         }
     }
 }
@@ -152,8 +154,7 @@ void updateClueStates() {
 }
 
 void resetGame() {
-    for(int i=0; i<GRID_ROWS; i++) 
-        for(int j=0; j<GRID_COLS; j++) playerGrid[i][j] = 0;
+    for(int i=0; i<GRID_ROWS; i++) for(int j=0; j<GRID_COLS; j++) playerGrid[i][j] = 0;
     gameWon = false;
     calculateTargetClues();
     updateClueStates();
@@ -164,18 +165,29 @@ void checkWin() {
     updateClueStates();
     const Puzzle* p = &allPuzzles[currentPuzzleIndex];
     bool match = true;
+    int pixelCount = 0;
+
     for(int r=0; r<GRID_ROWS; r++) {
         for(int c=0; c<GRID_COLS; c++) {
+            if (p->grid[r][c] == 1) pixelCount++;
             if ((p->grid[r][c] == 1 && playerGrid[r][c] != 1) ||
                 (p->grid[r][c] == 0 && playerGrid[r][c] == 1)) {
-                match = false; break;
+                match = false; 
             }
         }
     }
-    if (match) {
-        gameWon = true;
-        playSound(3);
-	triggerExplosion();
+    
+    if (!match) return;
+
+    gameWon = true;
+    playSound(3);
+    triggerExplosion();
+
+    if (!saveData.solved[currentPuzzleIndex]) {
+        saveData.solved[currentPuzzleIndex] = true;
+        int pointsEarned = 50 + (pixelCount * 2);
+        saveData.score += pointsEarned;
+        saveGame();
     }
 }
 
@@ -223,7 +235,6 @@ void renderGame(int cursorR, int cursorC) {
     u16 bg = gameWon ? COLOR_WIN_BG : COLOR_BG;
     for(int i=0; i<256*192; i++) videoBuffer[i] = bg;
 
-    // Pistas
     for(int c=0; c<GRID_COLS; c++) {
         u16 txtColor = colDone[c] ? COLOR_CLUE_DONE : COLOR_CLUE_TXT;
         int count = colClues[c].count;
@@ -244,7 +255,6 @@ void renderGame(int cursorR, int cursorC) {
         }
     }
 
-    // Grelha
     for(int r=0; r<GRID_ROWS; r++) {
         for(int c=0; c<GRID_COLS; c++) {
             int px = MARGIN_LEFT + (c * CELL_SIZE);
@@ -265,86 +275,77 @@ void renderGame(int cursorR, int cursorC) {
     if (!gameWon && cursorR >= 0) drawCursor(cursorR, cursorC);
 }
 
-// Algoritmo Fisher-Yates para baralhar o array
 void shuffleBag() {
-    // 1. Preencher o saco com IDs sequenciais (0, 1, 2...)
-    for (int i = 0; i < PUZZLE_COUNT; i++) {
-        puzzleBag[i] = i;
-    }
-    
-    // 2. Baralhar
+    for (int i = 0; i < PUZZLE_COUNT; i++) puzzleBag[i] = i;
     for (int i = PUZZLE_COUNT - 1; i > 0; i--) {
         int j = rand() % (i + 1);
         int temp = puzzleBag[i];
         puzzleBag[i] = puzzleBag[j];
         puzzleBag[j] = temp;
     }
-    
-    // 3. Reiniciar índice
     bagIndex = 0;
 }
 
-// Função para obter o próximo puzzle aleatório
 int getNextPuzzleID() {
-    if (bagIndex >= PUZZLE_COUNT) {
-        shuffleBag(); // Se acabaram os puzzles, baralha de novo
-    }
+    if (bagIndex >= PUZZLE_COUNT) shuffleBag();
     return puzzleBag[bagIndex++];
 }
 
-// Inicia uma explosão no centro do ecrã
 void triggerExplosion() {
     fireworksActive = true;
     for(int i=0; i<MAX_PARTICLES; i++) {
         particles[i].active = true;
-        particles[i].x = 128; // Centro horizontal
-        particles[i].y = 80;  // Centro vertical (aprox)
-        particles[i].life = 60 + (rand() % 60); // Vida entre 1 e 2 segundos
-        
-        // Cores aleatórias vibrantes
-        int r = rand() % 31;
-        int g = rand() % 31;
-        int b = rand() % 31;
+        particles[i].x = 128;
+        particles[i].y = 80;
+        particles[i].life = 60 + (rand() % 60);
+        int r = rand() % 31; int g = rand() % 31; int b = rand() % 31;
         particles[i].color = RGB15(r, g, b) | BIT(15);
-
-        // Velocidade explosiva aleatória
-        // (rand() % 100) / 20.0 - 2.5 dá um range entre -2.5 e 2.5
         particles[i].vx = ((rand() % 100) / 20.0) - 2.5; 
-        particles[i].vy = ((rand() % 100) / 20.0) - 3.5; // Mais força para cima
+        particles[i].vy = ((rand() % 100) / 20.0) - 3.5;
     }
 }
 
-// Atualiza física e desenha
 void updateAndDrawFireworks() {
     int activeCount = 0;
     for(int i=0; i<MAX_PARTICLES; i++) {
         if(!particles[i].active) continue;
-
         activeCount++;
-
-        // 1. Física
         particles[i].x += particles[i].vx;
         particles[i].y += particles[i].vy;
-        particles[i].vy += 0.08; // Gravidade
+        particles[i].vy += 0.08;
         particles[i].life--;
-
-        // 2. Apagar se sair do ecrã ou morrer
         if(particles[i].life <= 0 || particles[i].y > 192 || particles[i].x < 0 || particles[i].x > 256) {
             particles[i].active = false;
             continue;
         }
-
-        // 3. Desenhar (Plot)
-        // Desenhamos um pequeno quadrado 2x2 para ser mais visível
-        int px = (int)particles[i].x;
-        int py = (int)particles[i].y;
-        plot(px, py, particles[i].color);
-        plot(px+1, py, particles[i].color);
-        plot(px, py+1, particles[i].color);
-        plot(px+1, py+1, particles[i].color);
+        int px = (int)particles[i].x; int py = (int)particles[i].y;
+        plot(px, py, particles[i].color); plot(px+1, py, particles[i].color);
+        plot(px, py+1, particles[i].color); plot(px+1, py+1, particles[i].color);
     }
-
     if(activeCount == 0) fireworksActive = false;
+}
+
+// --- SAVE / LOAD SEGUROS ---
+void saveGame() {
+    if (!fatReady) return; // Se não houver cartão, ignora
+    FILE* file = fopen("pikranji.sav", "wb");
+    if (file) {
+        fwrite(&saveData, sizeof(SaveData), 1, file);
+        fclose(file);
+    }
+}
+
+void loadGame() {
+    saveData.score = 0;
+    for(int i=0; i<1000; i++) saveData.solved[i] = false;
+
+    if (!fatReady) return; // Se não houver cartão, ignora
+
+    FILE* file = fopen("pikranji.sav", "rb");
+    if (file) {
+        fread(&saveData, sizeof(SaveData), 1, file);
+        fclose(file);
+    } 
 }
 
 // ============================================================================
@@ -352,7 +353,7 @@ void updateAndDrawFireworks() {
 // ============================================================================
 int main(void) {
     irqEnable(IRQ_VBLANK);
-    soundEnable(); // Ligar motor de som
+    soundEnable(); 
 
     videoSetMode(MODE_0_2D);
     vramSetBankA(VRAM_A_MAIN_BG);
@@ -363,18 +364,19 @@ int main(void) {
     int bg3 = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     videoBuffer = bgGetGfxPtr(bg3);
 
-    // Inicializar a aleatoriedade com base no relógio do sistema (para não ser sempre igual)
+    // 4. Inicializar FAT com segurança
+    fatReady = fatInitDefault(); 
+    
+    // 5. Carregar e inicializar
+    loadGame(); 
     srand(time(NULL)); 
     shuffleBag();
-    
-    // Definir o primeiro puzzle
     currentPuzzleIndex = getNextPuzzleID();
-    
     resetGame();
+    
     int lastR = -1, lastC = -1;
     bool forceRender = true;
 
-    iprintf("\x1b[2;8H-- PIKRANJI DS --");
     iprintf("\x1b[4;2HControlos (Stylus +):");
     iprintf("\x1b[6;2H[Seta BAIXO] Pintar");
     iprintf("\x1b[7;2H[Seta CIMA]  Marcar (X)");
@@ -383,17 +385,15 @@ int main(void) {
 
     while(1) {
         swiIntrWait(1, IRQ_VBLANK);
-        updateSound(); // <--- Atualiza o timer do som a cada frame!
+        updateSound();
+        
         scanKeys();
         int held = keysHeld();
         int down = keysDown();
 
         if (down & KEY_START) { resetGame(); forceRender = true; }
-	if (down & KEY_SELECT) {
-            currentPuzzleIndex = getNextPuzzleID(); // Pega no próximo do saco baralhado
-            resetGame();
-            forceRender = true;
-        }
+        if (down & KEY_SELECT) { currentPuzzleIndex = getNextPuzzleID(); resetGame(); forceRender = true; }
+
         int currR = -1, currC = -1;
         if (held & KEY_TOUCH) {
             touchPosition touch;
@@ -403,34 +403,25 @@ int main(void) {
 
             if (r >= 0 && r < GRID_ROWS && c >= 0 && c < GRID_COLS) {
                 currR = r; currC = c;
-                
                 if (!gameWon) {
                     if (down & KEY_TOUCH) {
                         isDragging = true;
-                        if (held & KEY_UP) { 
-                            dragType = (playerGrid[r][c] == 2) ? 2 : 3; // Modo X
-                        } else if (held & KEY_DOWN) { 
-                            dragType = (playerGrid[r][c] == 1) ? 2 : 1; // Modo Pintar
-                        } else {
-                            dragType = 0; // Só mover
-                        }
+                        if (held & KEY_UP) dragType = (playerGrid[r][c] == 2) ? 2 : 3; 
+                        else if (held & KEY_DOWN) dragType = (playerGrid[r][c] == 1) ? 2 : 1; 
+                        else dragType = 0; 
                     }
-
                     if (isDragging && dragType != 0) {
                         int newState = -1;
-                        if (dragType == 1) newState = 1; // Pintar
-                        else if (dragType == 2) newState = 0; // Apagar
-                        else if (dragType == 3) newState = 2; // Marcar X
+                        if (dragType == 1) newState = 1; 
+                        else if (dragType == 2) newState = 0; 
+                        else if (dragType == 3) newState = 2; 
 
                         if (playerGrid[r][c] != newState) {
                             playerGrid[r][c] = newState;
-                            
-                            // Tocar som específico para cada ação
-                            if (newState == 1) playSound(0); // Pintar
-                            else if (newState == 2) playSound(1); // X
-                            else if (newState == 0) playSound(2); // Apagar
-
-                            checkWin();
+                            if (newState == 1) playSound(0);
+                            else if (newState == 2) playSound(1);
+                            else if (newState == 0) playSound(2);
+                            checkWin(); 
                             forceRender = true;
                         }
                     }
@@ -441,20 +432,28 @@ int main(void) {
             dragType = 0;
         }
 
-	if (forceRender || currR != lastR || currC != lastC || fireworksActive) {
+        if (forceRender || currR != lastR || currC != lastC || fireworksActive) {
             const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+            
+            iprintf("\x1b[2;2H-- PIKRANJI DS --");
+            iprintf("\x1b[2;20HScore: %d     ", saveData.score); 
+            
             iprintf("\x1b[14;2HPuzzle: %d / %d   ", currentPuzzleIndex + 1, PUZZLE_COUNT);
-	    iprintf("\x1b[16;2HSignificado:                                ");
-	    iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m", p->meaning);
+            
+            if (fatReady && saveData.solved[currentPuzzleIndex]) {
+                 iprintf("\x1b[14;20H\x1b[33m[RESOLVIDO]\x1b[39m");
+            } else {
+                 iprintf("\x1b[14;20H           ");
+            }
+
+            iprintf("\x1b[16;2HSignificado:                                ");
+            iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m", p->meaning);
             
             if (gameWon) iprintf("\x1b[18;2H** COMPLETO! ** ");
             else iprintf("\x1b[18;2H                  ");
 
             renderGame(currR, currC);
-	    // Desenha os fogos POR CIMA do jogo
-            if(fireworksActive) {
-                updateAndDrawFireworks();
-            }
+            if(fireworksActive) updateAndDrawFireworks();
 
             lastR = currR; lastC = currC;
             forceRender = false;

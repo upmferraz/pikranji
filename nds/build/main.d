@@ -111,7 +111,8 @@ main.o: /source/source/main.c /opt/devkitpro/libnds/include/nds.h \
  /opt/devkitpro/libnds/include/nds/arm9/trig_lut.h \
  /opt/devkitpro/libnds/include/nds/arm9/video.h \
  /opt/devkitpro/libnds/include/nds/arm9/videoGL.h \
- /source/include/puzzles.h
+ /source/include/puzzles.h /opt/devkitpro/libnds/include/fat.h \
+ /opt/devkitpro/libnds/include/dvm.h
 /opt/devkitpro/libnds/include/nds.h:
 /opt/devkitpro/calico/include/calico.h:
 /opt/devkitpro/calico/include/calico/types.h:
@@ -226,3 +227,5 @@ main.o: /source/source/main.c /opt/devkitpro/libnds/include/nds.h \
 /opt/devkitpro/libnds/include/nds/arm9/video.h:
 /opt/devkitpro/libnds/include/nds/arm9/videoGL.h:
 /source/include/puzzles.h:
+/opt/devkitpro/libnds/include/fat.h:
+/opt/devkitpro/libnds/include/dvm.h:
