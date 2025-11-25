@@ -19,6 +19,13 @@ BUILD		:=	build
 SOURCES		:=	gfx source data
 INCLUDES	:=	include build
 
+# --- 🆕 IDENTIDADE DO JOGO 🆕 ---
+# Estas variáveis são lidas automaticamente pelas regras da Nintendo
+GAME_TITLE    := Pikranji DS
+GAME_SUBTITLE := Kanji Picross
+GAME_AUTHOR   := seyon
+ICON          := icon.bmp
+
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
