@@ -9,56 +9,46 @@
     
     <style>
         :root {
+            /* Variáveis CSS que serão alteradas pelo JS */
             --ds-bg: #E0E8F8;        
             --ds-grid: #B0B8C8;      
             --ds-filled: #F85028;    
             --ds-cursor: #00C8F8;    
             --ds-text: #284060;      
             --ds-done: #A0A0A0;      
+            --ds-panel: #ffffff;
         }
 
-        /* Reset para garantir altura total real em mobile */
         html, body {
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden; /* Impede scroll na página inteira */
+            height: 100%; margin: 0; padding: 0; overflow: hidden;
         }
 
         body { 
             font-family: 'VT323', monospace; 
             background-color: #202020;
             color: var(--ds-text);
-            touch-action: none; /* Impede zoom/scroll nativo */
+            touch-action: none; 
             font-size: 1.2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
         
-        /* Contentor Principal Ajustável */
         #app-container {
             background-color: var(--ds-bg);
-            width: 100%;
-            max-width: 500px;
-            /* Altura dinâmica para fugir às barras do Android/iOS */
-            height: 100vh; 
+            width: 100%; max-width: 500px;
             height: 100dvh; 
-            display: flex;
-            flex-direction: column;
+            display: flex; flex-direction: column;
             box-shadow: 0 0 20px rgba(0,0,0,0.5);
             position: relative;
+            transition: background-color 0.5s ease;
         }
 
         .status-bar {
-            background-color: #284060;
+            background-color: var(--ds-text); /* Adapta-se ao tema */
             color: white;
             padding: 4px 10px;
-            display: flex;
-            justify-content: space-between;
-            font-size: 1.0rem;
-            flex-shrink: 0; /* Não encolher */
+            display: flex; justify-content: space-between;
+            font-size: 1.0rem; flex-shrink: 0;
+            transition: background-color 0.5s ease;
         }
 
         header {
@@ -66,59 +56,57 @@
             background-color: white;
             border-bottom: 2px solid var(--ds-grid);
             flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center;
         }
 
-        /* Área Principal com Scroll se necessário (para grelhas grandes) */
         main {
             flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start;
-            overflow-y: auto;
-            padding: 10px;
-            padding-bottom: 80px; /* Espaço extra para não bater no fundo */
+            display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+            overflow-y: auto; padding: 10px; padding-bottom: 80px;
         }
 
-        /* --- TABULEIRO --- */
+        /* TABULEIRO */
         .board-container { 
-            /* Tamanho responsivo mas contido */
-            width: 90vw; 
-            height: 90vw; 
-            max-width: 400px; 
-            max-height: 400px; 
+            width: 90vw; height: 90vw; 
+            max-width: 400px; max-height: 400px; 
             display: grid; 
-            grid-template-columns: 30px 1fr; 
-            grid-template-rows: 30px 1fr; 
-            gap: 0px; 
-            user-select: none;
-            margin-bottom: 10px;
+            grid-template-columns: 30px 1fr; grid-template-rows: 30px 1fr; 
+            gap: 0px; user-select: none; margin-bottom: 10px;
         }
 
         .clues-top { 
             grid-column: 2 / 3; grid-row: 1 / 2; 
             display: flex; justify-content: space-around; align-items: flex-end;
-            background-color: #f0f4fc; border-bottom: 1px solid var(--ds-grid);
+            background-color: #f0f4fc40; /* Ligeiramente transparente */
+            border-bottom: 1px solid var(--ds-grid);
         }
         .clues-left { 
             grid-column: 1 / 2; grid-row: 2 / 3; 
             display: flex; flex-direction: column; justify-content: space-around; align-items: flex-end; 
-            background-color: #f0f4fc; border-right: 1px solid var(--ds-grid);
+            background-color: #f0f4fc40; 
+            border-right: 1px solid var(--ds-grid);
             padding-right: 2px;
         }
         .clue-cell { 
             color: var(--ds-text); font-weight: bold; 
             display: flex; align-items: center; justify-content: center; 
             text-align: center; font-size: 0.8rem; line-height: 0.8;
-            width: 100%;
+            width: 100%; height: 100%;
+            transition: color 0.3s;
         }
-        .clue-cell.completed span { color: var(--ds-done); text-decoration: line-through; }
+        
+        /* Estilo para pistas completas */
+        .clue-cell.completed { opacity: 0.5; }
+        .clue-cell.completed span { 
+            color: var(--ds-done); 
+            text-decoration: line-through; 
+            text-decoration-thickness: 2px;
+        }
 
         .game-grid { 
             grid-column: 2 / 3; grid-row: 2 / 3; 
             display: grid; 
-            grid-template-columns: repeat(15, 1fr); 
-            grid-template-rows: repeat(15, 1fr); 
+            grid-template-columns: repeat(15, 1fr); grid-template-rows: repeat(15, 1fr); 
             gap: 1px; 
             background-color: var(--ds-grid); 
             border: 2px solid var(--ds-text);
@@ -133,21 +121,14 @@
             font-size: 1.0em; line-height: 0;
         }
 
-        /* Área de Controlos Fixa no Fundo (para não ser tapada) */
+        /* CONTROLOS */
         #controls-area {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+            position: absolute; bottom: 0; left: 0; width: 100%;
             background-color: var(--ds-bg);
             border-top: 2px solid var(--ds-text);
-            padding: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 100;
-            /* Padding para Safe Area do iPhone */
-            padding-bottom: max(10px, env(safe-area-inset-bottom));
+            padding: 10px; display: flex; justify-content: space-between; align-items: center;
+            z-index: 100; padding-bottom: max(10px, env(safe-area-inset-bottom));
+            transition: background-color 0.5s ease;
         }
 
         .control-btn {
@@ -155,34 +136,24 @@
             box-shadow: 2px 2px 0px rgba(0,0,0,0.2); color: var(--ds-text);
             font-family: 'VT323', monospace; text-transform: uppercase;
             font-size: 1.2rem; padding: 5px 12px;
+            transition: all 0.1s;
         }
         .control-btn:active { transform: translate(2px, 2px); box-shadow: none; }
         .control-btn.active-tool { background-color: var(--ds-cursor); color: white; border-color: #0088b0; }
         .action-btn { background-color: var(--ds-text); color: white; }
 
-        /* MINI MAPA FLUTUANTE */
+        /* MINI MAPA */
         #mini-map-container {
-            position: fixed; 
-            top: 60px; right: 20px; /* Ajustado para não ficar tapado */
-            width: 100px; height: 100px; 
-            background-color: white; 
-            border: 3px solid #284060;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            z-index: 9999; /* Z-Index muito alto */
-            opacity: 0; 
-            pointer-events: none; /* Clica através dele */
-            transition: opacity 0.2s;
+            position: fixed; top: 60px; right: 20px; width: 100px; height: 100px; 
+            background-color: white; border: 3px solid var(--ds-text);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 9999; opacity: 0; 
+            pointer-events: none; transition: opacity 0.2s;
         }
         .mini-cell { background-color: #eee; }
         .mini-filled { background-color: var(--ds-filled) !important; }
 
-        /* Canvas de Efeitos */
-        #fx-canvas {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 50;
-        }
+        #fx-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 50; }
         
-        /* Modal */
         #win-modal .modal-content {
             background-color: var(--ds-bg); border: 4px solid var(--ds-text);
             box-shadow: 10px 10px 0px rgba(0,0,0,0.5);
@@ -201,7 +172,7 @@
             <span id="ui-unlock">Unl: 10</span>
         </div>
         
-        <header class="flex justify-between items-center">
+        <header>
             <div>
                 <h1 class="text-2xl font-bold leading-none">PIKRANJI</h1>
                 <span id="puzzle-status" class="text-xs font-bold text-red-500"></span>
@@ -212,7 +183,7 @@
         <main>
             <div class="w-full text-center mb-2">
                 <p class="text-sm opacity-70" data-lang-key="meaningLabel">Significado:</p>
-                <h2 id="kanji-meaning" class="text-3xl font-bold text-indigo-800 leading-none">---</h2>
+                <h2 id="kanji-meaning" class="text-3xl font-bold leading-none" style="color: var(--ds-text)">---</h2>
             </div>
 
             <div id="game-board" class="board-container"></div>
@@ -234,81 +205,74 @@
     <div id="win-modal" class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center p-4 transition-opacity duration-300 opacity-0 pointer-events-none z-50">
         <div class="modal-content bg-white p-6 text-center transform scale-95 transition-all duration-300 w-64">
             <h2 class="text-4xl font-bold mb-2 text-green-600 blink" data-lang-key="congrats">CLEAR!</h2>
-            <div id="win-kanji" class="text-9xl font-black text-indigo-800 mb-2"></div>
+            <div id="win-kanji" class="text-9xl font-black mb-2" style="color: var(--ds-filled)"></div>
             <p id="win-meaning" class="text-2xl font-bold mb-4"></p>
             <button id="modal-next-btn" class="control-btn w-full bg-indigo-600 text-white" data-lang-key="nextChallenge">Próximo</button>
         </div>
     </div>
 
     <script>
-        // --- AUDIO SYSTEM (Estilo GameBoy) ---
+        // --- TEMAS (Cores convertidas do RGB15 da Nintendo DS) ---
+        const THEMES = [
+            { bg: "#E0E8F8", grid: "#B0B8C8", filled: "#F85028", cursor: "#00C8F8", text: "#284060", done: "#A0A0A0" }, // Padrão
+            { bg: "#D0F0D0", grid: "#A0C0A0", filled: "#50C850", cursor: "#F8A050", text: "#287828", done: "#90B090" }, // Floresta
+            { bg: "#C8E0F0", grid: "#A0B8C8", filled: "#28A0F8", cursor: "#F8C850", text: "#0050A0", done: "#90A0B0" }, // Oceano
+            { bg: "#F0E0D0", grid: "#C8B8A8", filled: "#C86028", cursor: "#28A078", text: "#784028", done: "#C0B0A0" }, // Madeira
+            { bg: "#E8D8F0", grid: "#C0B0C8", filled: "#A050C8", cursor: "#50F8A0", text: "#602878", done: "#B0A0B0" }, // Toxico
+        ];
+
+        function applyRandomTheme() {
+            const t = THEMES[Math.floor(Math.random() * THEMES.length)];
+            const root = document.documentElement.style;
+            root.setProperty('--ds-bg', t.bg);
+            root.setProperty('--ds-grid', t.grid);
+            root.setProperty('--ds-filled', t.filled);
+            root.setProperty('--ds-cursor', t.cursor);
+            root.setProperty('--ds-text', t.text);
+            root.setProperty('--ds-done', t.done);
+        }
+
+        // --- AUDIO SYSTEM ---
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
         function playSound(type) {
             if (audioCtx.state === 'suspended') audioCtx.resume();
             const osc = audioCtx.createOscillator();
             const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-
+            osc.connect(gain); gain.connect(audioCtx.destination);
             const now = audioCtx.currentTime;
             
-            if (type === 'fill') { // Som agudo curto
+            if (type === 'fill') { 
+                osc.type = 'square'; osc.frequency.setValueAtTime(400, now);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now+0.1);
+                osc.start(now); osc.stop(now+0.1);
+            } else if (type === 'mark') { 
+                osc.type = 'triangle'; osc.frequency.setValueAtTime(150, now);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.001, now+0.1);
+                osc.start(now); osc.stop(now+0.1);
+            } else if (type === 'win') {
                 osc.type = 'square';
-                osc.frequency.setValueAtTime(400, now);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            } 
-            else if (type === 'mark') { // Ruído/Grave
-                osc.type = 'triangle';
-                osc.frequency.setValueAtTime(150, now);
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-                osc.start(now);
-                osc.stop(now + 0.1);
-            }
-            else if (type === 'win') { // Melodia de Vitória
-                osc.type = 'square';
-                gain.gain.value = 0.1;
-                
-                // Arpeggio simples
-                osc.frequency.setValueAtTime(523.25, now);       // C5
-                osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
-                osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
-                osc.frequency.setValueAtTime(1046.50, now + 0.3);// C6
-                
-                gain.gain.setValueAtTime(0.1, now);
-                gain.gain.linearRampToValueAtTime(0, now + 0.6);
-                
-                osc.start(now);
-                osc.stop(now + 0.6);
+                osc.frequency.setValueAtTime(523.25, now); osc.frequency.setValueAtTime(659.25, now+0.1);
+                osc.frequency.setValueAtTime(783.99, now+0.2); osc.frequency.setValueAtTime(1046.50, now+0.3);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.linearRampToValueAtTime(0, now+0.6);
+                osc.start(now); osc.stop(now+0.6);
             }
         }
 
-        // --- PARTICLE SYSTEM (Confetti) ---
+        // --- PARTICLE SYSTEM ---
         const canvas = document.getElementById('fx-canvas');
         const ctx = canvas.getContext('2d');
         let particles = [];
-
-        function resizeCanvas() {
-            canvas.width = canvas.offsetWidth;
-            canvas.height = canvas.offsetHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        function resizeCanvas() { canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight; }
+        window.addEventListener('resize', resizeCanvas); resizeCanvas();
 
         function triggerConfetti() {
             particles = [];
+            const color = getComputedStyle(document.documentElement).getPropertyValue('--ds-filled').trim();
             for(let i=0; i<100; i++) {
                 particles.push({
-                    x: canvas.width / 2,
-                    y: canvas.height / 2,
-                    vx: (Math.random() - 0.5) * 10,
-                    vy: (Math.random() - 0.5) * 10,
-                    color: `hsl(${Math.random() * 360}, 100%, 50%)`,
-                    life: 100
+                    x: canvas.width / 2, y: canvas.height / 2,
+                    vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10,
+                    color: color, life: 100
                 });
             }
             animateParticles();
@@ -317,44 +281,35 @@
         function animateParticles() {
             if (particles.length === 0) { ctx.clearRect(0,0,canvas.width,canvas.height); return; }
             ctx.clearRect(0,0,canvas.width,canvas.height);
-            
-            particles.forEach((p, index) => {
-                p.x += p.vx;
-                p.y += p.vy;
-                p.life--;
-                ctx.fillStyle = p.color;
-                ctx.fillRect(p.x, p.y, 5, 5);
-                if(p.life <= 0) particles.splice(index, 1);
+            particles.forEach((p, i) => {
+                p.x += p.vx; p.y += p.vy; p.life--;
+                ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 5, 5);
+                if(p.life <= 0) particles.splice(i, 1);
             });
-            
             requestAnimationFrame(animateParticles);
         }
 
         // --- GAME LOGIC ---
-
         document.addEventListener('DOMContentLoaded', async () => {
-            const LANG_PT = 'pt';
-            const LANG_EN = 'en';
-            const GRID_SIZE = 15;
-
+            const LANG_PT = 'pt'; const LANG_EN = 'en'; const GRID_SIZE = 15;
             let saveData = { score: 0, unlockedLimit: 10, solvedCount: 0, language: LANG_PT, solved: {} };
-            const stored = localStorage.getItem('pikranji_save_v4');
+            const stored = localStorage.getItem('pikranji_save_v5');
             if (stored) saveData = JSON.parse(stored);
 
             let puzzles = [], puzzleBag = [], currentPuzzleID = 0;
-            let currentGrid = [], userGrid = [];
-            let currentTool = 'fill';
+            let currentGrid = [], userGrid = [], currentTool = 'fill';
             let gameWon = false, cheated = false;
             let currentPuzzleClues = { rowClues: [], colClues: [] };
             let domCells = [];
 
-            // UI Refs
             const boardEl = document.getElementById('game-board');
             const uiScore = document.getElementById('ui-score');
             const uiUnlock = document.getElementById('ui-unlock');
             const uiMeaning = document.getElementById('kanji-meaning');
             const uiStatus = document.getElementById('puzzle-status');
             const langBtn = document.getElementById('lang-btn');
+            const fillBtn = document.getElementById('fill-btn');
+            const markBtn = document.getElementById('mark-btn');
             const miniMapGrid = document.getElementById('mini-map-grid');
             const miniMapContainer = document.getElementById('mini-map-container');
             const winModal = document.getElementById('win-modal');
@@ -364,33 +319,30 @@
                 en: { meaningLabel: "Meaning:", solve: "!", hint: "?", next: "Sel", congrats: "CLEAR!", nextChallenge: "Next", solved: "SOLVED", cheated: "CHEATED" }
             };
 
-            // Load Data
             try {
                 const res = await fetch('puzzles.json');
                 if (!res.ok) throw new Error();
                 puzzles = await res.json();
                 puzzles.forEach((p, i) => { p.id = i; p.complexity = p.grid.flat().filter(x => x === 1).length; });
                 puzzles.sort((a,b) => a.complexity - b.complexity);
-                
                 createMiniMap();
                 refreshUI();
                 loadNextPuzzle(false);
             } catch (e) { console.error(e); uiMeaning.textContent = "ERRO JSON"; }
 
-            function saveGame() { localStorage.setItem('pikranji_save_v4', JSON.stringify(saveData)); refreshUI(); }
+            function saveGame() { localStorage.setItem('pikranji_save_v5', JSON.stringify(saveData)); refreshUI(); }
 
             function loadNextPuzzle(force = false) {
                 if (force || puzzleBag.length === 0) {
                     let limit = Math.min(saveData.unlockedLimit, puzzles.length);
-                    puzzleBag = puzzles.slice(0, limit).map(p => p.id);
-                    // Shuffle simples
-                    puzzleBag.sort(() => Math.random() - 0.5);
+                    puzzleBag = puzzles.slice(0, limit).map(p => p.id).sort(() => Math.random() - 0.5);
                 }
                 currentPuzzleID = puzzleBag.pop();
                 const p = puzzles.find(x => x.id === currentPuzzleID);
                 currentGrid = p.grid;
                 userGrid = Array.from({length: GRID_SIZE}, () => Array(GRID_SIZE).fill(0));
                 gameWon = false; cheated = false;
+                applyRandomTheme();
                 renderGrid();
                 hideWinModal();
                 refreshUI();
@@ -400,12 +352,10 @@
                 const lang = saveData.language;
                 const t = translations[lang];
                 const p = puzzles.find(x => x.id === currentPuzzleID);
-
                 document.querySelectorAll('[data-lang-key]').forEach(el => {
                     const key = el.getAttribute('data-lang-key');
                     if (t[key]) el.textContent = t[key];
                 });
-                
                 langBtn.textContent = `[X] ${lang.toUpperCase()}`;
                 uiScore.textContent = `Sc: ${saveData.score}`;
                 uiUnlock.textContent = `Unl: ${Math.min(saveData.unlockedLimit, puzzles.length)}`;
@@ -416,16 +366,16 @@
                     document.getElementById('win-meaning').textContent = mean;
                     document.getElementById('win-kanji').textContent = p.kanji;
                 }
-
                 if (saveData.solved[currentPuzzleID]) uiStatus.textContent = t.solved;
                 else if (cheated) uiStatus.textContent = t.cheated;
                 else uiStatus.textContent = "";
             }
 
-            // --- GRID LOGIC ---
+            // --- LÓGICA GRELHA + VERIFICAÇÃO DE PISTAS ---
             function renderGrid() {
                 boardEl.innerHTML = '';
                 domCells = [];
+
                 const generate = (g) => {
                     const rC = g.map(row => { let c=[],n=0; for(let x of row){if(x===1)n++;else{if(n>0)c.push(n);n=0;}} if(n>0)c.push(n); return c.length?c:[0]; });
                     const cC = [];
@@ -435,22 +385,24 @@
                 const {rC, cC} = generate(currentGrid);
                 currentPuzzleClues = {rowClues: rC, colClues: cC};
 
-                // Spacer
-                const sp = document.createElement('div'); boardEl.appendChild(sp);
+                const sp = document.createElement('div'); sp.style.backgroundColor="var(--ds-bg)"; boardEl.appendChild(sp);
                 
-                // Top
                 const topD = document.createElement('div'); topD.className=`clues-top grid grid-cols-${GRID_SIZE}`;
                 topD.style.gridTemplateColumns=`repeat(${GRID_SIZE},1fr)`;
-                cC.forEach(c => { const d=document.createElement('div'); d.className='clue-cell'; d.innerHTML=c.map(n=>`<span>${n}</span>`).join('<br>'); topD.appendChild(d); });
+                cC.forEach(c => { 
+                    const d=document.createElement('div'); d.className='clue-cell'; 
+                    d.innerHTML=c.map(n=>`<span>${n}</span>`).join('<br>'); topD.appendChild(d); 
+                });
                 boardEl.appendChild(topD);
 
-                // Left
                 const leftD = document.createElement('div'); leftD.className=`clues-left grid grid-rows-${GRID_SIZE}`;
                 leftD.style.gridTemplateRows=`repeat(${GRID_SIZE},1fr)`;
-                rC.forEach(c => { const d=document.createElement('div'); d.className='clue-cell'; d.innerHTML=c.map(n=>`<span>${n}</span>`).join('&nbsp;'); leftD.appendChild(d); });
+                rC.forEach(c => { 
+                    const d=document.createElement('div'); d.className='clue-cell'; 
+                    d.innerHTML=c.map(n=>`<span>${n}</span>`).join('&nbsp;'); leftD.appendChild(d); 
+                });
                 boardEl.appendChild(leftD);
 
-                // Cells
                 const g = document.createElement('div'); g.className='game-grid';
                 g.style.gridTemplateColumns=`repeat(${GRID_SIZE},1fr)`; g.style.gridTemplateRows=`repeat(${GRID_SIZE},1fr)`;
                 for(let r=0;r<GRID_SIZE;r++) for(let c=0;c<GRID_SIZE;c++){
@@ -459,7 +411,44 @@
                     g.appendChild(cell); domCells.push(cell);
                 }
                 boardEl.appendChild(g);
-                checkClues();
+                checkClues(); // Verificar pistas no início (para casos de 0s)
+            }
+
+            function checkClues() {
+                // Helpers
+                const getRowClues = (r) => {
+                    const arr = userGrid[r];
+                    let c=[], n=0; for(let x of arr){if(x===1)n++;else{if(n>0)c.push(n);n=0;}} if(n>0)c.push(n); return c.length?c:[0];
+                };
+                const getColClues = (c) => {
+                    let arr=[], n=0, cl=[]; for(let r=0;r<GRID_SIZE;r++) arr.push(userGrid[r][c]);
+                    for(let x of arr){if(x===1)n++;else{if(n>0)cl.push(n);n=0;}} if(n>0)cl.push(n); return cl.length?cl:[0];
+                };
+
+                // DOM Elements
+                const rowDivs = document.querySelectorAll('.clues-left .clue-cell');
+                const colDivs = document.querySelectorAll('.clues-top .clue-cell');
+
+                // Verificar Linhas
+                currentPuzzleClues.rowClues.forEach((target, r) => {
+                    const current = getRowClues(r);
+                    if (JSON.stringify(target) === JSON.stringify(current)) rowDivs[r].classList.add('completed');
+                    else rowDivs[r].classList.remove('completed');
+                });
+
+                // Verificar Colunas
+                currentPuzzleClues.colClues.forEach((target, c) => {
+                    const current = getColClues(c);
+                    if (JSON.stringify(target) === JSON.stringify(current)) colDivs[c].classList.add('completed');
+                    else colDivs[c].classList.remove('completed');
+                });
+            }
+
+            function updateCell(r, c) {
+                const cell = domCells[r*GRID_SIZE+c]; if(!cell) return;
+                cell.className = 'cell';
+                if(userGrid[r][c]===1) cell.classList.add('filled');
+                if(userGrid[r][c]===2) cell.classList.add('marked');
             }
 
             function handleInteraction(r, c, isDrag) {
@@ -469,54 +458,32 @@
                     if(currentTool === 'fill') dragTargetState = (v===1)?0:1;
                     else dragTargetState = (v===2)?0:2;
                 }
-                
                 if(userGrid[r][c] !== dragTargetState) {
                     userGrid[r][c] = dragTargetState;
-                    updateCell(r, c);
-                    updateMiniMap(r, c);
+                    updateCell(r, c); updateMiniMap(r, c);
                     playSound(currentTool === 'fill' ? 'fill' : 'mark');
+                    checkClues(); // <-- Verificar Pistas a cada interação
                     checkWin();
                 }
             }
 
-            function updateCell(r, c) {
-                const cell = domCells[r*GRID_SIZE+c];
-                if(!cell) return;
-                cell.className = 'cell';
-                if(userGrid[r][c]===1) cell.classList.add('filled');
-                if(userGrid[r][c]===2) cell.classList.add('marked');
-            }
-
             function checkWin() {
-                checkClues();
                 for(let r=0;r<GRID_SIZE;r++) for(let c=0;c<GRID_SIZE;c++) {
                     if ((userGrid[r][c]===1) !== (currentGrid[r][c]===1)) return;
                 }
-                
                 if(!gameWon) {
                     gameWon = true;
-                    playSound('win');
-                    triggerConfetti();
-                    
+                    playSound('win'); triggerConfetti();
                     if(!saveData.solved[currentPuzzleID] && !cheated) {
                         saveData.solved[currentPuzzleID] = true;
-                        saveData.solvedCount++;
-                        saveData.score += 50;
-                        if(saveData.solvedCount >= saveData.unlockedLimit - 2) saveData.unlockedLimit += 5;
+                        saveData.solvedCount++; saveData.score += 50;
+                        if(saveData.solvedCount >= saveData.unlockedLimit - 2 && saveData.unlockedLimit < puzzles.length) saveData.unlockedLimit += 5;
                         saveGame();
                     }
                     showWinModal();
                 }
             }
-            
-            function checkClues() {
-                // Simples verificação visual (pode ser expandida)
-                const rowDivs = document.querySelectorAll('.clues-left .clue-cell');
-                const colDivs = document.querySelectorAll('.clues-top .clue-cell');
-                // (Lógica completa de verificação de pistas omitida para brevidade, mas funcional no conceito)
-            }
 
-            // --- MINI MAPA ---
             function createMiniMap() {
                 miniMapGrid.innerHTML = '';
                 for(let i=0; i<GRID_SIZE*GRID_SIZE; i++) {
@@ -525,12 +492,8 @@
                 }
             }
             function updateMiniMap(r, c) {
-                const idx = r*GRID_SIZE+c;
-                const el = miniMapGrid.children[idx];
-                if(el) {
-                    el.className = 'mini-cell';
-                    if(userGrid[r][c]===1) el.classList.add('mini-filled');
-                }
+                const idx = r*GRID_SIZE+c; const el = miniMapGrid.children[idx];
+                if(el) { el.className = 'mini-cell'; if(userGrid[r][c]===1) el.classList.add('mini-filled'); }
                 miniMapContainer.style.opacity = '1';
                 clearTimeout(miniMapContainer.hideTimer);
                 miniMapContainer.hideTimer = setTimeout(()=> miniMapContainer.style.opacity='0', 1500);
@@ -538,7 +501,6 @@
 
             // --- INPUTS ---
             let isDraw = false, dragTargetState = 0;
-
             const onStart = (e) => {
                 const t = e.touches ? e.touches[0] : e;
                 const el = document.elementFromPoint(t.clientX, t.clientY);
@@ -548,7 +510,6 @@
                     handleInteraction(parseInt(el.dataset.r), parseInt(el.dataset.c), false);
                 }
             };
-            
             const onMove = (e) => {
                 if(!isDraw) return;
                 if(e.cancelable && e.type === 'touchmove') e.preventDefault();
@@ -566,23 +527,43 @@
             window.addEventListener('mouseup', () => isDraw=false);
             window.addEventListener('touchend', () => isDraw=false);
 
-            // Botões
             document.getElementById('fill-btn').onclick = function() { currentTool='fill'; this.classList.add('active-tool'); document.getElementById('mark-btn').classList.remove('active-tool'); };
             document.getElementById('mark-btn').onclick = function() { currentTool='mark'; this.classList.add('active-tool'); document.getElementById('fill-btn').classList.remove('active-tool'); };
             document.getElementById('lang-btn').onclick = () => { saveData.language = (saveData.language===LANG_PT)?LANG_EN:LANG_PT; saveGame(); };
             document.getElementById('next-btn').onclick = () => loadNextPuzzle(false);
             document.getElementById('solve-btn').onclick = () => { 
-                cheated=true; userGrid = currentGrid.map(r=>r.map(c=>c===1?1:2)); 
+                if(gameWon) return; cheated=true; 
+                userGrid = currentGrid.map(r=>r.map(c=>c===1?1:2)); 
                 userGrid.forEach((r,ri)=>r.forEach((c,ci)=>updateCell(ri,ci))); 
-                checkWin(); refreshUI(); 
+                checkClues(); checkWin(); refreshUI(); 
             };
-            document.getElementById('modal-next-btn').onclick = () => loadNextPuzzle(false);
-            
-            // Keyboard
+            document.getElementById('hint-btn').onclick = () => {
+                if(gameWon) return;
+                if(saveData.score > 0) {
+                    saveData.score--; saveGame();
+                    let attempts = 0;
+                    while(attempts < 100) {
+                        const r = Math.floor(Math.random()*GRID_SIZE), c = Math.floor(Math.random()*GRID_SIZE);
+                        const target = currentGrid[r][c], current = userGrid[r][c];
+                        if ((target === 1 && current !== 1) || (target === 0 && current === 1)) {
+                            userGrid[r][c] = target === 1 ? 1 : 2;
+                            updateCell(r, c); checkClues(); checkWin(); break;
+                        }
+                        attempts++;
+                    }
+                } else alert("Score insuficiente (1)");
+            };
             document.addEventListener('keydown', e => { if(e.key.toLowerCase() === 'x') document.getElementById('lang-btn').click(); });
 
             function showWinModal() { winModal.style.opacity='1'; winModal.style.pointerEvents='auto'; }
             function hideWinModal() { winModal.style.opacity='0'; winModal.style.pointerEvents='none'; }
+            document.getElementById('modal-next-btn').onclick = () => loadNextPuzzle(false);
+            
+            document.getElementById('reset-btn').onclick = () => {
+                userGrid = Array.from({length: GRID_SIZE}, () => Array(GRID_SIZE).fill(0));
+                domCells.forEach(c => { c.className='cell'; });
+                checkClues();
+            };
         });
     </script>
 </body>
