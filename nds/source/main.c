@@ -6,6 +6,19 @@
 #include <fat.h>
 
 // ============================================================================
+// 🌍 LOCALIZAÇÃO & TEXTOS
+// ============================================================================
+#define LANG_PT 0
+#define LANG_EN 1
+
+// Textos da Interface Dinâmica [Lingua][ID]
+// 0: Score, 1: Desbloq/Unlock, 2: Resolvido/Solved, 3: Batota/Cheated, 4: Significado/Meaning, 5: Completo/Complete
+const char* UI_TEXT[2][6] = {
+    {"Score", "Desbloq", "RESOLVIDO", "BATOTA", "Significado", "COMPLETO!"},
+    {"Score", "Unlock",  "SOLVED",    "CHEATED", "Meaning",     "COMPLETE!"}
+};
+
+// ============================================================================
 // 🎨 CORES & TEMAS
 // ============================================================================
 typedef struct {
@@ -53,7 +66,8 @@ void saveGame();
 void loadGame();
 void useHint();
 void solvePuzzle();
-void initPuzzleSystem(); // NOVO: Ordena puzzles
+void initPuzzleSystem();
+void refreshStaticText(int lang);
 
 #define CELL_SIZE 10
 #define GRID_COLS 15
@@ -68,6 +82,7 @@ typedef struct {
     int unlockedLimit; // Quantos puzzles estão disponíveis (ex: 10, 20...)
     int solvedCount;   // Total de puzzles resolvidos únicos
     bool solved[1000]; 
+    int language;      // NOVO: 0 = PT, 1 = EN (Adicionado no fim para compatibilidade)
 } SaveData;
 
 SaveData saveData;
@@ -272,7 +287,6 @@ void checkWin() {
         
         // --- LÓGICA DE UNLOCK ---
         // Se já resolveu puzzles suficientes perto do limite, abre mais 10
-        // Ex: Se tem 10 abertos e já resolveu 5, abre para 20.
         if (saveData.solvedCount >= (saveData.unlockedLimit - 5)) {
             if (saveData.unlockedLimit < PUZZLE_COUNT) {
                 saveData.unlockedLimit += 10;
@@ -466,8 +480,9 @@ void saveGame() {
 
 void loadGame() {
     saveData.score = 0;
-    saveData.unlockedLimit = 10; // Começa com 10 puzzles fáceis
+    saveData.unlockedLimit = 10; 
     saveData.solvedCount = 0;
+    saveData.language = LANG_PT; // Default PT
     for(int i=0; i<1000; i++) saveData.solved[i] = false;
 
     if (!fatReady) return; 
@@ -476,10 +491,42 @@ void loadGame() {
     if (file) {
         fread(&saveData, sizeof(SaveData), 1, file);
         fclose(file);
-        // Proteção contra dados corrompidos ou mudanças de versão
+        
         if (saveData.unlockedLimit < 10) saveData.unlockedLimit = 10;
         if (saveData.unlockedLimit > PUZZLE_COUNT) saveData.unlockedLimit = PUZZLE_COUNT;
+        
+        // Sanity Check for Lang
+        if (saveData.language != LANG_PT && saveData.language != LANG_EN) {
+            saveData.language = LANG_PT;
+        }
     } 
+}
+
+// NOVO: Função para atualizar textos estáticos da UI
+void refreshStaticText(int lang) {
+    // Limpar área de texto (hack simples para limpar)
+    iprintf("\x1b[2J"); 
+    
+    // Redesenhar instruções
+    if (lang == LANG_PT) {
+        iprintf("\x1b[4;2HControlos (Stylus +):");
+        iprintf("\x1b[6;2H[Seta BAIXO] Pintar");
+        iprintf("\x1b[7;2H[Seta CIMA]  Marcar (X)");
+        iprintf("\x1b[9;2H[Select]     Prox. Puzzle");
+        iprintf("\x1b[10;2H[Start]      Reiniciar");
+        iprintf("\x1b[21;1H[?] Ajuda (Custo 1)");
+        iprintf("\x1b[21;20H[!] Resolver");
+        iprintf("\x1b[22;1H[X] Idioma: PT");
+    } else {
+        iprintf("\x1b[4;2HControls (Stylus +):");
+        iprintf("\x1b[6;2H[DOWN Arrow] Fill");
+        iprintf("\x1b[7;2H[UP Arrow]   Mark (X)");
+        iprintf("\x1b[9;2H[Select]     Next Puzzle");
+        iprintf("\x1b[10;2H[Start]      Restart");
+        iprintf("\x1b[21;1H[?] Hint (Cost 1)");
+        iprintf("\x1b[21;20H[!] Solve");
+        iprintf("\x1b[22;1H[X] Lang: EN  ");
+    }
 }
 
 // ============================================================================
@@ -498,7 +545,6 @@ int main(void) {
     int bg3 = bgInitSub(3, BgType_Bmp16, BgSize_B16_256x256, 0, 0);
     videoBuffer = bgGetGfxPtr(bg3);
 
-    // 1. Inicializar sistema de puzzles (ordenação)
     initPuzzleSystem();
 
     fatReady = fatInitDefault(); 
@@ -508,17 +554,11 @@ int main(void) {
     currentPuzzleIndex = getNextPuzzleID();
     resetGame();
     
+    // Desenhar textos iniciais
+    refreshStaticText(saveData.language);
+    
     int lastR = -1, lastC = -1;
     bool forceRender = true;
-
-    iprintf("\x1b[4;2HControlos (Stylus +):");
-    iprintf("\x1b[6;2H[Seta BAIXO] Pintar");
-    iprintf("\x1b[7;2H[Seta CIMA]  Marcar (X)");
-    iprintf("\x1b[9;2H[Select]     Prox. Puzzle");
-    iprintf("\x1b[10;2H[Start]      Reiniciar");
-    
-    iprintf("\x1b[21;1H[?] Ajuda (Custo 1)");
-    iprintf("\x1b[21;20H[!] Resolver");
 
     while(1) {
         swiIntrWait(1, IRQ_VBLANK);
@@ -529,6 +569,14 @@ int main(void) {
 
         if (down & KEY_START) { resetGame(); forceRender = true; }
         if (down & KEY_SELECT) { currentPuzzleIndex = getNextPuzzleID(); resetGame(); forceRender = true; }
+        
+        // Mudar Idioma
+        if (down & KEY_X) {
+            saveData.language = (saveData.language == LANG_PT) ? LANG_EN : LANG_PT;
+            saveGame();
+            refreshStaticText(saveData.language); // Atualiza textos estáticos
+            forceRender = true; // Força update dos textos dinâmicos (score, significado)
+        }
 
         int currR = -1, currC = -1;
         if (down & KEY_TOUCH) {
@@ -591,21 +639,26 @@ int main(void) {
 
         if (forceRender || currR != lastR || currC != lastC || fireworksActive) {
             const Puzzle* p = &allPuzzles[currentPuzzleIndex];
+            int L = saveData.language;
             
             iprintf("\x1b[2;2H-- PIKRANJI DS --");
-            iprintf("\x1b[2;20HScore: %d     ", saveData.score); 
+            // Texto dinâmico traduzido
+            iprintf("\x1b[2;20H%s: %d     ", UI_TEXT[L][0], saveData.score); 
             
             // HUD de Progresso
-            iprintf("\x1b[14;2HDesbloq: %d/%d   ", saveData.unlockedLimit, PUZZLE_COUNT);
+            iprintf("\x1b[14;2H%s: %d/%d   ", UI_TEXT[L][1], saveData.unlockedLimit, PUZZLE_COUNT);
             
-            if (fatReady && saveData.solved[currentPuzzleIndex]) iprintf("\x1b[14;20H\x1b[33m[RESOLVIDO]\x1b[39m");
-            else if (cheated) iprintf("\x1b[14;20H\x1b[31m[BATOTA]   \x1b[39m");
+            if (fatReady && saveData.solved[currentPuzzleIndex]) iprintf("\x1b[14;20H\x1b[33m[%s]\x1b[39m", UI_TEXT[L][2]);
+            else if (cheated) iprintf("\x1b[14;20H\x1b[31m[%s]   \x1b[39m", UI_TEXT[L][3]);
             else iprintf("\x1b[14;20H           ");
 
-            iprintf("\x1b[16;2HSignificado:                                ");
-            iprintf("\x1b[16;2HSignificado: \x1b[32m%s\x1b[39m", p->meaning);
+            iprintf("\x1b[16;2H%s:                                ", UI_TEXT[L][4]);
             
-            if (gameWon) iprintf("\x1b[18;2H** COMPLETO! ** ");
+            // Escolha do significado baseada na língua
+            const char* meaningStr = (L == LANG_EN) ? p->meaning_en : p->meaning_pt;
+            iprintf("\x1b[16;2H%s: \x1b[32m%s\x1b[39m", UI_TEXT[L][4], meaningStr);
+            
+            if (gameWon) iprintf("\x1b[18;2H** %s ** ", UI_TEXT[L][5]);
             else iprintf("\x1b[18;2H                  ");
 
             renderGame(currR, currC);
