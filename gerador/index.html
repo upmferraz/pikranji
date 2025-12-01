@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gerador de JSON Kanji</title>
+    <title>Gerador de JSON Kanji - Pikranji</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -38,54 +38,69 @@
     <div class="container mx-auto p-4 sm:p-6 md:p-8">
         <header class="text-center mb-8">
             <h1 class="text-4xl font-bold text-stone-900">Gerador de JSON Kanji</h1>
-            <p class="text-stone-600 mt-2">Desenhe o Kanji numa grelha 15x15, adicione o significado e exporte a sua coleção.</p>
+            <p class="text-stone-600 mt-2">Editor e Criador de Puzzles Multilingue</p>
         </header>
 
         <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
             
             <div class="bg-white p-6 rounded-lg shadow-md">
-                <h2 class="text-2xl font-semibold mb-4 text-stone-800">Criador de Kanji</h2>
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold text-stone-800" id="editor-title">Novo Kanji</h2>
+                    <button id="cancel-edit-btn" class="hidden text-sm text-red-500 hover:text-red-700 font-semibold">Cancelar Edição</button>
+                </div>
+                
                 <div class="space-y-4">
-                    <div>
-                        <label for="kanji-input" class="block text-sm font-medium text-stone-700">Caractere Kanji</label>
-                        <input type="text" id="kanji-input" maxlength="1" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm">
+                    <div class="flex gap-4">
+                        <div class="w-1/3">
+                            <label for="kanji-input" class="block text-sm font-medium text-stone-700">Kanji</label>
+                            <input type="text" id="kanji-input" maxlength="1" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm" placeholder="Ex: 木">
+                        </div>
+                        <div class="w-2/3">
+                            </div>
                     </div>
-                    <div>
-                        <label for="meaning-input" class="block text-sm font-medium text-stone-700">Significado (em Português)</label>
-                        <input type="text" id="meaning-input" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm">
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label for="meaning-input" class="block text-sm font-medium text-stone-700">Significado (PT)</label>
+                            <input type="text" id="meaning-input" class="mt-1 block w-full px-3 py-2 bg-white border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm" placeholder="Ex: Árvore">
+                        </div>
+                        <div>
+                            <label for="meaning-en-input" class="block text-sm font-medium text-stone-700">Significado (EN)</label>
+                            <input type="text" id="meaning-en-input" class="mt-1 block w-full px-3 py-2 bg-stone-50 border border-stone-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Ex: Tree">
+                        </div>
                     </div>
                 </div>
 
                 <div class="mt-6">
-                    <p class="block text-sm font-medium text-stone-700 mb-2">Grelha de Desenho</p>
+                    <p class="block text-sm font-medium text-stone-700 mb-2">Grelha de Desenho (15x15)</p>
                     <div id="drawing-grid" class="grid grid-cols-15 w-fit mx-auto" style="display: grid; grid-template-columns: repeat(15, minmax(0, 1fr));">
                     </div>
                 </div>
                 
                 <div class="flex items-center justify-center gap-4 mt-6">
-                    <button id="add-btn" class="btn bg-amber-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-amber-600">Adicionar Kanji</button>
-                    <button id="clear-btn" class="btn bg-stone-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-stone-600">Limpar Grelha</button>
+                    <button id="add-btn" class="btn bg-amber-500 text-white font-bold py-2 px-6 rounded-lg shadow-sm hover:bg-amber-600">Adicionar à Coleção</button>
+                    <button id="clear-btn" class="btn bg-stone-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-stone-600">Limpar</button>
                 </div>
             </div>
             
             <div class="bg-white p-6 rounded-lg shadow-md flex flex-col">
-                <h2 class="text-2xl font-semibold mb-4 text-stone-800">Coleção e Exportação</h2>
+                <h2 class="text-2xl font-semibold mb-4 text-stone-800">Coleção (<span id="collection-count">0</span>)</h2>
                 
-                <div id="kanji-list" class="flex-grow space-y-3 pr-2 overflow-y-auto max-h-80 mb-4">
+                <div id="kanji-list" class="flex-grow space-y-3 pr-2 overflow-y-auto max-h-96 mb-4">
                     <p id="empty-list-msg" class="text-stone-500 text-center py-4">A sua coleção está vazia.</p>
                 </div>
                 
-                <div class="mt-auto">
+                <div class="mt-auto pt-4 border-t border-stone-200">
                     <div>
-                        <label for="json-output" class="block text-sm font-medium text-stone-700">Saída JSON</label>
-                        <textarea id="json-output" readonly class="mt-1 block w-full h-40 p-2 bg-stone-50 border border-stone-300 rounded-md font-mono text-xs"></textarea>
+                        <label for="json-output" class="block text-sm font-medium text-stone-700">Pré-visualização JSON</label>
+                        <textarea id="json-output" readonly class="mt-1 block w-full h-32 p-2 bg-stone-50 border border-stone-300 rounded-md font-mono text-xs"></textarea>
                     </div>
                     <div class="text-center mt-4 flex gap-4">
-                        <button id="load-btn" class="btn w-1/2 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-blue-600">Carregar Coleção (JSON)</button>
-                        <button id="download-btn" class="btn w-1/2 bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-emerald-600 disabled:bg-stone-300 disabled:cursor-not-allowed" disabled>Gerar e Descarregar JSON</button>
+                        <button id="load-btn" class="btn w-1/2 bg-blue-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-blue-600">Importar JSON</button>
+                        <button id="download-btn" class="btn w-1/2 bg-emerald-500 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:bg-emerald-600 disabled:bg-stone-300 disabled:cursor-not-allowed" disabled>Exportar JSON</button>
                     </div>
                     <input type="file" id="json-file-input" accept=".json" class="hidden">
-                    </div>
+                </div>
             </div>
 
         </main>
@@ -97,21 +112,29 @@
             let kanjiCollection = [];
             let currentGridState = Array(GRID_SIZE).fill(null).map(() => Array(GRID_SIZE).fill(0));
             let isDrawing = false;
+            let editingIndex = null; // null = creating new, number = editing index
 
+            // UI References
             const drawingGrid = document.getElementById('drawing-grid');
             const kanjiInput = document.getElementById('kanji-input');
             const meaningInput = document.getElementById('meaning-input');
+            const meaningEnInput = document.getElementById('meaning-en-input'); // New Field
+            
             const addBtn = document.getElementById('add-btn');
             const clearBtn = document.getElementById('clear-btn');
+            const cancelEditBtn = document.getElementById('cancel-edit-btn');
+            const editorTitle = document.getElementById('editor-title');
+            
             const kanjiList = document.getElementById('kanji-list');
+            const collectionCount = document.getElementById('collection-count');
             const jsonOutput = document.getElementById('json-output');
             const downloadBtn = document.getElementById('download-btn');
             const emptyListMsg = document.getElementById('empty-list-msg');
             
-            // NOVOS ELEMENTOS
             const loadBtn = document.getElementById('load-btn');
             const jsonFileInput = document.getElementById('json-file-input');
-            // FIM NOVOS ELEMENTOS
+
+            // --- GRID LOGIC ---
 
             function createDrawingGrid() {
                 drawingGrid.innerHTML = '';
@@ -132,10 +155,67 @@
                 cells.forEach(cell => cell.classList.remove('active'));
             }
 
+            function updateGridVisuals() {
+                const cells = drawingGrid.querySelectorAll('.grid-cell');
+                cells.forEach(cell => {
+                    const r = parseInt(cell.dataset.row);
+                    const c = parseInt(cell.dataset.col);
+                    if (currentGridState[r][c] === 1) {
+                        cell.classList.add('active');
+                    } else {
+                        cell.classList.remove('active');
+                    }
+                });
+            }
+
+            // --- UI & STATE LOGIC ---
+
             function updateUI() {
                 renderKanjiList();
                 renderJsonPreview();
                 updateDownloadButtonState();
+                collectionCount.textContent = kanjiCollection.length;
+            }
+
+            function resetEditor() {
+                editingIndex = null;
+                kanjiInput.value = '';
+                meaningInput.value = '';
+                meaningEnInput.value = '';
+                clearDrawingGrid();
+                
+                // Reset UI State to "Create Mode"
+                addBtn.textContent = 'Adicionar à Coleção';
+                addBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                addBtn.classList.add('bg-amber-500', 'hover:bg-amber-600');
+                editorTitle.textContent = 'Novo Kanji';
+                cancelEditBtn.classList.add('hidden');
+            }
+
+            function startEditing(index) {
+                const item = kanjiCollection[index];
+                if (!item) return;
+
+                editingIndex = index;
+                
+                // Populate Inputs
+                kanjiInput.value = item.kanji;
+                meaningInput.value = item.meaning;
+                meaningEnInput.value = item.meaning_en || ''; // Handle legacy without EN
+                
+                // Populate Grid (Deep copy to avoid reference issues)
+                currentGridState = JSON.parse(JSON.stringify(item.grid));
+                updateGridVisuals();
+
+                // Update UI State to "Edit Mode"
+                addBtn.textContent = 'Guardar Alterações';
+                addBtn.classList.remove('bg-amber-500', 'hover:bg-amber-600');
+                addBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                editorTitle.textContent = `Editar: ${item.kanji}`;
+                cancelEditBtn.classList.remove('hidden');
+
+                // Scroll to top
+                window.scrollTo({ top: 0, behavior: 'smooth' });
             }
 
             function renderKanjiList() {
@@ -147,11 +227,12 @@
                      emptyListMsg.style.display = 'none';
                     kanjiCollection.forEach((item, index) => {
                         const listItem = document.createElement('div');
-                        listItem.className = 'flex items-center justify-between p-3 bg-stone-50 rounded-lg border border-stone-200';
+                        listItem.className = `flex items-center justify-between p-3 rounded-lg border ${editingIndex === index ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : 'bg-stone-50 border-stone-200'}`;
                         
                         const infoDiv = document.createElement('div');
                         infoDiv.className = 'flex items-center gap-4';
 
+                        // Mini Preview
                         const previewGrid = document.createElement('div');
                         previewGrid.style.display = 'grid';
                         previewGrid.style.gridTemplateColumns = `repeat(${GRID_SIZE}, minmax(0, 1fr))`;
@@ -170,9 +251,11 @@
                         const kanjiText = document.createElement('p');
                         kanjiText.className = 'text-xl font-bold';
                         kanjiText.textContent = item.kanji;
+                        
                         const meaningText = document.createElement('p');
                         meaningText.className = 'text-sm text-stone-600';
-                        meaningText.textContent = item.meaning;
+                        // Show both meanings if available
+                        meaningText.textContent = item.meaning + (item.meaning_en ? ` / ${item.meaning_en}` : '');
 
                         textDiv.appendChild(kanjiText);
                         textDiv.appendChild(meaningText);
@@ -180,16 +263,31 @@
                         infoDiv.appendChild(previewGrid);
                         infoDiv.appendChild(textDiv);
 
+                        // Actions Group
+                        const actionsDiv = document.createElement('div');
+                        actionsDiv.className = 'flex flex-col gap-1 sm:flex-row sm:gap-2';
+
+                        const editBtn = document.createElement('button');
+                        editBtn.textContent = 'Editar';
+                        editBtn.className = 'text-blue-500 hover:text-blue-700 text-sm font-semibold px-2';
+                        editBtn.onclick = () => startEditing(index);
+
                         const removeBtn = document.createElement('button');
                         removeBtn.textContent = 'Remover';
-                        removeBtn.className = 'text-red-500 hover:text-red-700 text-sm font-semibold';
+                        removeBtn.className = 'text-red-500 hover:text-red-700 text-sm font-semibold px-2';
                         removeBtn.onclick = () => {
-                            kanjiCollection.splice(index, 1);
-                            updateUI();
+                            if (confirm(`Tem a certeza que deseja remover "${item.kanji}"?`)) {
+                                kanjiCollection.splice(index, 1);
+                                if (editingIndex === index) resetEditor(); // If removing current being edited
+                                updateUI();
+                            }
                         };
 
+                        actionsDiv.appendChild(editBtn);
+                        actionsDiv.appendChild(removeBtn);
+
                         listItem.appendChild(infoDiv);
-                        listItem.appendChild(removeBtn);
+                        listItem.appendChild(actionsDiv);
                         kanjiList.appendChild(listItem);
                     });
                 }
@@ -204,44 +302,41 @@
             }
             
             function updateDownloadButtonState() {
-                if (kanjiCollection.length > 0) {
-                    downloadBtn.disabled = false;
-                } else {
-                    downloadBtn.disabled = true;
-                }
+                downloadBtn.disabled = kanjiCollection.length === 0;
             }
 
-            // NOVO: Função para carregar coleção (FileReader)
+            // --- FILE I/O ---
+
             function loadKanjiCollection(file) {
                 const reader = new FileReader();
-
                 reader.onload = (event) => {
                     try {
                         const loadedData = JSON.parse(event.target.result);
-                        
-                        // Validação básica do formato (pode ser expandida)
-                        if (Array.isArray(loadedData) && loadedData.every(item => item.kanji && item.meaning && Array.isArray(item.grid))) {
-                            kanjiCollection = loadedData;
+                        if (Array.isArray(loadedData)) {
+                            // Validate and fix potentially missing fields
+                            kanjiCollection = loadedData.map(item => ({
+                                kanji: item.kanji || "?",
+                                meaning: item.meaning || "Sem significado",
+                                meaning_en: item.meaning_en || "", // Ensure field exists
+                                grid: item.grid || Array(GRID_SIZE).fill(Array(GRID_SIZE).fill(0))
+                            }));
+                            
                             updateUI();
-                            alert(`Coleção carregada com sucesso! ${kanjiCollection.length} Kanijis adicionados.`);
+                            resetEditor();
+                            alert(`Coleção carregada! ${kanjiCollection.length} Kanijis importados.`);
                         } else {
-                            throw new Error("Formato JSON inválido para a coleção de Kanji.");
+                            throw new Error("Formato JSON inválido.");
                         }
                     } catch (e) {
-                        alert(`Erro ao carregar o ficheiro JSON: ${e.message}`);
+                        alert(`Erro ao ler JSON: ${e.message}`);
                     }
                 };
-
-                reader.onerror = () => {
-                    alert('Erro ao ler o ficheiro.');
-                };
-
                 reader.readAsText(file);
             }
-            // FIM NOVO: Função para carregar coleção
 
+            // --- EVENTS ---
 
-            // Lógica para desenhar arrastando o rato
+            // Grid Interaction (Draw)
             drawingGrid.addEventListener('mousedown', (e) => {
                 if (e.target.classList.contains('grid-cell')) {
                     isDrawing = true;
@@ -256,61 +351,73 @@
                 if (isDrawing && e.target.classList.contains('grid-cell')) {
                     const row = parseInt(e.target.dataset.row);
                     const col = parseInt(e.target.dataset.col);
-                    currentGridState[row][col] = 1;
+                    currentGridState[row][col] = 1; // Drag always paints
                     e.target.classList.add('active');
                 }
             });
 
-            drawingGrid.addEventListener('mouseup', () => {
-                isDrawing = false;
-            });
-            
-            drawingGrid.addEventListener('mouseleave', () => {
-                isDrawing = false;
-            });
+            drawingGrid.addEventListener('mouseup', () => isDrawing = false);
+            drawingGrid.addEventListener('mouseleave', () => isDrawing = false);
 
+            // Button Actions
             addBtn.addEventListener('click', () => {
-                const kanji = kanjiInput.value;
-                const meaning = meaningInput.value;
+                const kanji = kanjiInput.value.trim();
+                const meaning = meaningInput.value.trim();
+                const meaningEn = meaningEnInput.value.trim();
 
                 if (!kanji || !meaning) {
-                    alert('Por favor, preencha os campos Kanji e Significado.');
+                    alert('Por favor, preencha pelo menos o Kanji e o Significado em Português.');
                     return;
                 }
                 
                 const hasDrawing = currentGridState.some(row => row.some(cell => cell === 1));
                 if (!hasDrawing) {
-                    alert('Por favor, desenhe o Kanji na grelha.');
+                    alert('A grelha está vazia. Desenhe o Kanji.');
                     return;
                 }
 
-                const newKanji = {
+                const newKanjiObj = {
                     kanji,
                     meaning,
+                    meaning_en: meaningEn, // Save new field
                     grid: JSON.parse(JSON.stringify(currentGridState))
                 };
 
-                kanjiCollection.push(newKanji);
+                if (editingIndex !== null) {
+                    // UPDATE existing
+                    kanjiCollection[editingIndex] = newKanjiObj;
+                    alert(`Kanji "${kanji}" atualizado!`);
+                    resetEditor();
+                } else {
+                    // CREATE new
+                    kanjiCollection.push(newKanjiObj);
+                    kanjiInput.value = '';
+                    meaningInput.value = '';
+                    meaningEnInput.value = '';
+                    clearDrawingGrid();
+                }
                 
-                kanjiInput.value = '';
-                meaningInput.value = '';
-                clearDrawingGrid();
                 updateUI();
             });
 
             clearBtn.addEventListener('click', clearDrawingGrid);
+            cancelEditBtn.addEventListener('click', resetEditor);
             
+            // Download Logic
             downloadBtn.addEventListener('click', () => {
                 if (kanjiCollection.length === 0) return;
 
+                // Custom Formatting to keep grids readable in code (on multiple lines)
                 const formattedJsonObjects = kanjiCollection.map(item => {
                     const formattedGrid = item.grid.map(row => {
                         return '            ' + JSON.stringify(row);
                     }).join(',\n');
 
+                    // Include meaning_en in export
                     return `    {
         "kanji": "${item.kanji}",
         "meaning": "${item.meaning}",
+        "meaning_en": "${item.meaning_en}",
         "grid": [
 ${formattedGrid}
         ]
@@ -323,30 +430,22 @@ ${formattedGrid}
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'kanji_collection.json';
+                a.download = 'puzzles.json';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
             });
 
-            // NOVO: Event listeners para o carregamento do ficheiro
-            loadBtn.addEventListener('click', () => {
-                // Clica programaticamente no input de ficheiro escondido para abrir o seletor
-                jsonFileInput.click();
-            });
-
+            // Load File Events
+            loadBtn.addEventListener('click', () => jsonFileInput.click());
             jsonFileInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
-                if (file) {
-                    loadKanjiCollection(file);
-                }
-                // Limpa o valor do input para permitir o carregamento do mesmo ficheiro novamente
+                if (file) loadKanjiCollection(file);
                 event.target.value = null;
             });
-            // FIM NOVO: Event listeners
 
-
+            // Initialization
             createDrawingGrid();
             updateUI();
         });
