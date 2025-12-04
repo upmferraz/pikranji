@@ -18,7 +18,7 @@ TARGET		:=	$(shell basename $(CURDIR))
 BUILD		:=	build
 SOURCES		:=	gfx source data
 INCLUDES	:=	include build
-
+NITRODATA	:= 	nitrofs
 # --- 🆕 IDENTIDADE DO JOGO 🆕 ---
 # Estas variáveis são lidas automaticamente pelas regras da Nintendo
 GAME_TITLE    := Pikranji DS

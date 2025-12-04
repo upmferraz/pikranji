@@ -37,4 +37,8 @@ Não precisas de instalar o toolchain devkitPro no teu sistema. O script `build.
 
 ## 🎮 Como Jogar
 
-Abre o ficheiro `.nds` gerado no teu emulador favorito:
+Abre o ficheiro `.nds` gerado na tua consola ou emulador.
+
+# Nota
+Esta aplicação foi amplamente desenvolvida recorrendo a inteligência artificial, no caso foi utilizado o Gemini 2.5 e Gemini 3 Pro.
+A música, fotografia são da minha autoria, para a música recorri ao software LMMS. Os melhores Kanji aqui gerados foram gerados manualmente recorrendo ao gerador incluído no software em HTML

@@ -6,6 +6,7 @@ IMAGE_NAME="nds-builder"
 # Se passares o argumento "clean", ele limpa antes
 if [ "$1" == "clean" ]; then
     echo "🧹 A limpar builds anteriores..."
+    sudo rm -rf build/*
     sudo docker run --rm -v $(pwd):/source -w /source $IMAGE_NAME make clean
 fi
 
